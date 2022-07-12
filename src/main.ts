@@ -7,7 +7,7 @@ import { App } from './view'
 
 export default function VCardTable(element: HTMLElement, options = {}) {
 
-  let sound = new Sound()
+  let sound = new Sound(element)
 
   render(App(sound), element)
 

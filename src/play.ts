@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { Vec2 } from 'soli2d'
+import { Vec2 } from './vec2'
 
 export function loop_for(duration: number, fn: (dt: number, dt0: number, i: number) => void) {
   let _elapsed = 0
@@ -76,6 +76,9 @@ export class DragDecay {
     return new DragDecay(drag, orig, target, no_start)
   }
 
+  get drag_move() {
+    return Vec2.make(...this.drag.move)
+  }
 
   get move() {
     return Vec2.make(...this.drag.move).add(this.decay)
