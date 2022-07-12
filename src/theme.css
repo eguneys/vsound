@@ -1,0 +1,15 @@
+
+.box label {
+  color: white;
+}
+
+.up-down span.value {
+  background: #111;
+  color: white;
+}
+
+.up-down span.value-up,
+.up-down span.value-down {
+  background: #121212;
+  color: white;
+}

@@ -1,0 +1,21 @@
+.box {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.up-down {
+  display: flex;
+  user-select: none;
+  cursor: pointer;
+}
+
+.box span.value-up,
+.box span.value-down {
+  padding: 0.1em 0.1em;
+}
+
+.box span.value {
+  padding: 0.1em 0.1em;
+  border-radius: 0.1em;
+}
