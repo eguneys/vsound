@@ -122,7 +122,6 @@ export default class Mouse {
       scaleY = 1
 
     if (res) {
-      console.log(res[1], bounds)
       res[0] -= bounds.left
       res[1] -= bounds.top
 

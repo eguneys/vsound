@@ -5,7 +5,7 @@ import { render } from 'solid-js/web'
 import Sound from './sound'
 import { App } from './view'
 
-export default function VCardTable(element: HTMLElement, options = {}) {
+export default function VSound(element: HTMLElement, options = {}) {
 
   let sound = new Sound(element)
 

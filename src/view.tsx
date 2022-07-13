@@ -22,7 +22,7 @@ export const App = sound => props => {
   return (<vsound>
     <toolbar>
     <box>
-      <label>speed</label> <UpDownControl value={sound.speed.value} setValue={_ => sound.speed.value = _}/>
+      <label>speed</label> <UpDownControl value={sound.loop.speed} setValue={_ => sound.loop.speed = _}/>
       </box>
    <box>
       <label>loop</label> 
@@ -33,7 +33,7 @@ export const App = sound => props => {
     </toolbar>
     <pitch-bar ref={_ => setTimeout(() => sound.pitch.ref.$ref = _)}>
       <For each={sound.pitch.bars}>{ item =>
-        <Bar style={item.style}/>
+        <Bar item={item}/>
       }</For>
     </pitch-bar>
       </vsound>)
@@ -42,7 +42,7 @@ export const App = sound => props => {
 
 const Bar = props => {
 
-  return <bar style={props.style}></bar>
+  return <bar class={props.item.klass} style={props.item.style}></bar>
 }
 
 const dformat = v => v < 10 ? `0${v}` : `${v}`

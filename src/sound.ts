@@ -1,8 +1,13 @@
-import { createSignal, createMemo, mapArray, createEffect } from 'solid-js'
+import { onCleanup, on, createSignal, createMemo, mapArray, createEffect } from 'solid-js'
 import { read, write, owrite } from './play'
 import { make_ref, make_drag } from './make_sticky'
 import { Vec2 } from './vec2'
 import { make_position } from './make_util'
+import { loop } from './play'
+import { make_adsr, PlayerController } from './audio/player'
+import { pianokey_pitch_octave } from './audio/piano'
+import { make_note_po } from './audio/types'
+import { white_c5, white_key } from './audio/piano'
 
 
 function make_hooks(sound: Sound) {
@@ -37,26 +42,76 @@ export default class Sound {
   constructor($element) {
 
     this.refs = []
-    this.speed = make_value(9, 0, 13)
-    this.loop = make_loop()
-
+    this.player = make_player(this)
     this.pitch = make_pitch(this)
+    this.loop = make_loop(this)
+  }
+}
+
+const make_player = (sound: Sound) => {
+
+  let synth = {
+    volume: 1,
+    amplitude: 0.7,
+    cutoff: 0.6,
+    cutoff_max: 0.2,
+    amp_adsr: make_adsr(2, 8, 0.2, 10),
+    filter_adsr: make_adsr(0, 8, 0.2, 0)
+  }
+
+  let player = new PlayerController(synth)
+
+
+  function index_to_key(index: number) {
+    let pitch = index + 1
+    return white_key(white_c5, pitch - 1)
+  }
+
+  return {
+    set cursor(cursor: number) {
+      if (cursor) {
+        let duration = sound.loop.speed * 16 / 1000
+        let index = Math.floor(sound.pitch.bars[cursor].y * 48)
+
+        let key = index_to_key(index)
+        let po = pianokey_pitch_octave(key)
+        let note = make_note_po(po, 2)
+
+        let i = player.attack(note, player.currentTime)
+        player.release(i, player.currentTime + duration)
+
+      }
+    }
   }
 }
 
 const make_pitch_bar = (sound: Sound, y: number) => {
 
   let _y = createSignal(y)
+  let _hi = createSignal(false)
 
   let m_style = createMemo(() => ({
     height: `${read(_y)*100}%`
   }))
 
+  let m_klass = createMemo(() => [
+    read(_hi) ? 'hi': ''
+  ].join(' '))
+
   return {
+    set hi(v: boolean) {
+      owrite(_hi, v)
+    },
     set y(y: value) {
+      y = Math.floor(y * 48) / 48
       owrite(_y, y)
     },
-
+    get y() {
+      return read(_y)
+    },
+    get klass() {
+      return m_klass()
+    },
     get style() {
       return m_style()
     }
@@ -90,6 +145,9 @@ const make_pitch = (sound: Sound) => {
   let m_bars = createMemo(mapArray(_bars[0], _ => make_pitch_bar(sound, _)))
 
   return {
+    set cursor(cursor: number | undefined) {
+      m_bars().forEach((bar, i) => bar.hi = cursor === i)
+    },
     get bars() {
       return m_bars()
     },
@@ -106,13 +164,61 @@ const make_pitch = (sound: Sound) => {
 
 }
 
-const make_loop = () => {
+const make_loop = (sound: Sound) => {
+
+  let _speed = createSignal(9)
 
   let _mode = createSignal('stop')
   let _begin = createSignal(0)
   let _end = createSignal(0)
 
+  let _cursor = createSignal()
+
+
+  let m_one_duration = createMemo(() => {
+    let i = read(_speed)
+
+    return i * 16 
+  })
+
+  createEffect(on(_mode[0], (value) => {
+    if (value === 'play') {
+
+      owrite(_cursor, read(_begin))
+      let i = 0
+      let cancel = loop((dt: number, dt0: number) => {
+        i += dt
+
+        let dur = m_one_duration()
+
+        if (i > dur) {
+          i -= dur
+          owrite(_cursor, _ => (_ + 1) % 32)
+        }
+      })
+
+      onCleanup(() => {
+        owrite(_cursor, undefined)
+        cancel()
+      })
+    }
+  }))
+
+  createEffect(() => {
+    let cursor = read(_cursor)
+    sound.pitch.cursor = cursor
+    sound.player.cursor = cursor
+  })
   return {
+    set speed(speed: number) {
+      if (speed < 1 || speed > 20) {
+        return
+      }
+      owrite(_speed, speed)
+    },
+    get speed() {
+      return read(_speed)
+    },
     change_mode() {
       owrite(_mode, this.mode)
     },
@@ -130,22 +236,6 @@ const make_loop = () => {
     },
     set end(v: number) {
       owrite(_end, (v + 33) % 33)
-    }
-  }
-}
-
-
-const make_value = (n: any, min: any, max: any) => {
-  let _v = createSignal(n)
-  return {
-    get value() {
-      return read(_v)
-    },
-    set value(v: any) {
-      if (v === min || v === max) {
-        return
-      }
-      owrite(_v, v)
     }
   }
 }
