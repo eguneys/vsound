@@ -85,7 +85,7 @@ const LBar = props => {
 
  const or_dot = (_) => !!_ ? _ : '.'
 
-  return <bar onClick={_ => props.item.select()} class={props.item.lklass}>
+  return <bar onClick={_ => props.item.select()} class={[props.item.klass, props.item.lklass].join(' ')}>
     <span>{or_dot(props.item.note)}</span>
     <span>{or_dot(props.item.octave)}</span>
     <span>{or_dot(props.item.wave)}</span>

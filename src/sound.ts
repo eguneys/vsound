@@ -7,7 +7,9 @@ import { loop } from './play'
 import { make_adsr, PlayerController } from './audio/player'
 import { pianokey_pitch_octave } from './audio/piano'
 import { make_note_po } from './audio/types'
-import { white_c5, white_key } from './audio/piano'
+import { white_c5, index_white, index_black } from './audio/piano'
+import { note_uci } from './audio/uci'
+import { note_octave } from './audio/types'
 
 
 function make_hooks(sound: Sound) {
@@ -77,20 +79,11 @@ const make_player = (sound: Sound) => {
   let player = new PlayerController(synth)
 
 
-  function index_to_key(index: number) {
-    let pitch = index + 1
-    return white_key(white_c5, pitch - 1)
-  }
-
   return {
     set cursor(cursor: number) {
       if (cursor) {
         let duration = sound.loop.speed * 16 / 1000
-        let index = Math.floor(sound.pitch.bars[cursor].y * 48)
-
-        let key = index_to_key(index)
-        let po = pianokey_pitch_octave(key)
-        let note = make_note_po(po, 2)
+        let note = sound.pitch.bars[cursor].note_value
 
         let i = player.attack(note, player.currentTime)
         player.release(i, player.currentTime + duration)
@@ -100,10 +93,30 @@ const make_player = (sound: Sound) => {
   }
 }
 
+const y_key = [...Array(4).keys()].flatMap(octave => [
+  index_white(0 + octave * 7),
+  index_black(0 + octave * 5),
+  index_white(1 + octave * 7),
+  index_black(1 + octave * 5),
+  index_white(2 + octave * 7),
+  index_white(3 + octave * 7),
+  index_black(2 + octave * 5),
+  index_white(4 + octave * 7),
+  index_black(3 + octave * 5),
+  index_white(5 + octave * 7),
+  index_black(4 + octave * 5),
+  index_white(6 + octave * 7)
+])
+
 const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: number) => {
 
   let _y = createSignal(y)
   let _hi = createSignal(false)
+
+  let m_y = createMemo(() => Math.floor(read(_y) * 48))
+  let m_key = createMemo(() => y_key[m_y()])
+
+  let m_note = createMemo(() => make_note_po(pianokey_pitch_octave(m_key()), 2))
 
   let m_style = createMemo(() => ({
     height: `${read(_y)*100}%`
@@ -118,6 +131,15 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
   ].join(' '))
 
   return {
+    get note_value() {
+      return m_note()
+    },
+    get note() {
+      return note_uci(m_note())
+    },
+    get octave() {
+      return note_octave(m_note())
+    },
     get lklass() {
       return m_lklass()
     },
@@ -162,7 +184,6 @@ const make_pitch = (sound: Sound) => {
       }
       drag = make_drag(make_hooks(sound), $ref)
       sound.refs.push(drag)
-      console.log(sound.refs)
     }
   })
 

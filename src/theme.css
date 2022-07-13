@@ -39,3 +39,8 @@ list-bar bar.edit {
   background: lightyellow;
   color: black;
 }
+
+list-bar bar.hi {
+  background: yellow;
+  color: black;
+}
