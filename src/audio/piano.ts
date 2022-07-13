@@ -7,6 +7,11 @@ export type PianoKey = Black | White
 
 export const nb_white = 5 * 7
 
+export const black_c3 = index_black(0)
+export const white_c3 = index_white(0)
+export const black_c6 = index_black(5 + 5 + 5)
+export const white_c6 = index_white(7 + 7 + 7)
+
 export const black_c4 = index_black(5)
 export const black_c5 = index_black(5 + 5)
 export const white_c4 = index_white(7)

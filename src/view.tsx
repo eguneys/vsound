@@ -54,8 +54,8 @@ const ListBar = props => {
     <div>
       <div class='group'>
       <label>octave</label><octave>
-       <For each={[1,2,3,4]}>{ i =>
-         <span>{i}</span>
+       <For each={[3,4,5,6]}>{ i =>
+         <span onClick={_ => sound.controls.octave = i} class={sound.controls.octave===i ? 'active':''}>{i}</span>
        }</For>
       </octave>
       </div>
@@ -63,7 +63,7 @@ const ListBar = props => {
       <label>volume</label>
       <volume>
        <For each={[0,1,2,3,4,5]}>{ i =>
-         <span>{i}</span>
+         <span onClick={_ => sound.controls.volume = i} class={sound.controls.volume ===i ? 'active':''}>{i}</span>
        }</For>
       </volume>
       </div>

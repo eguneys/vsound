@@ -7,10 +7,10 @@ import { loop } from './play'
 import { make_adsr, PlayerController } from './audio/player'
 import { pianokey_pitch_octave } from './audio/piano'
 import { make_note_po } from './audio/types'
-import { white_c5, index_white, index_black } from './audio/piano'
+import { index_white, index_black } from './audio/piano'
 import { note_uci } from './audio/uci'
 import { note_octave } from './audio/types'
-
+import { make_input } from './make_input'
 
 function make_hooks(sound: Sound) {
   return { 
@@ -33,6 +33,14 @@ function make_hooks(sound: Sound) {
 }
 
 
+function make_input_hooks(sound: Sound) {
+  return {
+    piano_bs(bs: [Key, Key, Key]) {
+
+    }
+  }
+}
+
 export default class Sound {
 
 
@@ -40,14 +48,38 @@ export default class Sound {
     this.refs.forEach(_ => _.$clear_bounds())
   }
 
-
   constructor($element) {
 
+    this.input = make_input(make_input_hooks(this))
+
     this.refs = []
+    this.controls = make_controls(this)
     this.tabbar = make_tabbar(this)
     this.player = make_player(this)
     this.pitch = make_pitch(this)
     this.loop = make_loop(this)
+  }
+}
+
+
+const make_controls = (sound: Sound) => {
+
+  let _octave = createSignal(4)
+  let _volume = createSignal(5)
+
+  return {
+    set volume(volume: number) {
+      owrite(_volume, volume)
+    },
+    get volume() {
+      return read(_volume)
+    },
+    set octave(octave: number) {
+      owrite(_octave,  octave)
+    },
+    get octave() {
+      return read(_octave)
+    }
   }
 }
 
@@ -78,12 +110,38 @@ const make_player = (sound: Sound) => {
 
   let player = new PlayerController(synth)
 
+  let play_buffer = []
 
   return {
     set cursor(cursor: number) {
-      if (cursor) {
+      if (cursor !== undefined && !play_buffer.includes(cursor)) {
         let duration = sound.loop.speed * 16 / 1000
         let note = sound.pitch.bars[cursor].note_value
+        let lookaheads = [
+          [cursor + 1, cursor + 2, cursor + 3],
+          [cursor + 1, cursor + 2],
+          [cursor + 1]
+        ].map(lookahead =>
+              lookahead.filter(_ => _ < 32)
+              .map(_ => sound.pitch.bars[_].note_value))
+
+        let note_duration = 1
+
+        if (lookaheads[0].length === 3 &&
+            lookaheads[0].every(_ => _ === note)) {
+            note_duration = 4
+            play_buffer = [cursor + 1, cursor + 2, cursor + 3]
+        } else if (lookaheads[1].length === 2 &&
+                   lookaheads[1].every(_ => _ === note)) {
+            note_duration = 3
+            play_buffer = [cursor + 1, cursor + 2]
+        } else if (lookaheads[2].length === 1 &&
+                   lookaheads[2].every(_ => _ === note)) {
+            note_duration = 2
+            play_buffer = [cursor + 1]
+        }
+
+        duration *= note_duration
 
         let i = player.attack(note, player.currentTime)
         player.release(i, player.currentTime + duration)

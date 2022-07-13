@@ -30,7 +30,7 @@ tabbar label {
 }
 
 tabbar label.active {
-  border-bottom: 2px solid orange;
+  border-bottom: 2px solid lightyellow;
 }
 
 box .play {
@@ -113,7 +113,15 @@ list-list volume {
 
 list-list octave span,
 list-list volume span {
+  user-select: none;
+  cursor: pointer;
   padding: 0 0.2em;
+}
+
+list-list octave span.active,
+list-list volume span.active {
+  background: lightyellow;
+  color: black;
 }
 
 list-list .group {
