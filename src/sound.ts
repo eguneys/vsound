@@ -42,9 +42,24 @@ export default class Sound {
   constructor($element) {
 
     this.refs = []
+    this.tabbar = make_tabbar(this)
     this.player = make_player(this)
     this.pitch = make_pitch(this)
     this.loop = make_loop(this)
+  }
+}
+
+const make_tabbar = (sound: Sound) => {
+
+  let _active = createSignal('list')
+
+  return {
+    set active(active: string) {
+      owrite(_active, active)
+    },
+    get active() {
+      return read(_active)
+    }
   }
 }
 
@@ -85,7 +100,7 @@ const make_player = (sound: Sound) => {
   }
 }
 
-const make_pitch_bar = (sound: Sound, y: number) => {
+const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: number) => {
 
   let _y = createSignal(y)
   let _hi = createSignal(false)
@@ -98,7 +113,14 @@ const make_pitch_bar = (sound: Sound, y: number) => {
     read(_hi) ? 'hi': ''
   ].join(' '))
 
+  let m_lklass = createMemo(() => [
+    edit_cursor() === i ? 'edit': ''
+  ].join(' '))
+
   return {
+    get lklass() {
+      return m_lklass()
+    },
     set hi(v: boolean) {
       owrite(_hi, v)
     },
@@ -114,6 +136,9 @@ const make_pitch_bar = (sound: Sound, y: number) => {
     },
     get style() {
       return m_style()
+    },
+    select() {
+      sound.pitch.select(i)
     }
 
   }
@@ -126,11 +151,18 @@ const make_pitch = (sound: Sound) => {
   let drag
  
  
+  let _edit_cursor = createSignal()
+  let m_edit_cursor = createMemo(() => read(_edit_cursor))
+
   createEffect(() => {
     let $ref = ref.$ref
-    if (!drag && $ref) {
+    if ($ref) {
+      if (drag) {
+        sound.refs.splice(sound.refs.indexOf(drag), 1)
+      }
       drag = make_drag(make_hooks(sound), $ref)
       sound.refs.push(drag)
+      console.log(sound.refs)
     }
   })
 
@@ -142,9 +174,15 @@ const make_pitch = (sound: Sound) => {
 
   let _bars = createSignal([...Array(32).keys()].map(_ => 0.5))
 
-  let m_bars = createMemo(mapArray(_bars[0], _ => make_pitch_bar(sound, _)))
+  let m_bars = createMemo(mapArray(_bars[0], (_, i) => make_pitch_bar(sound, m_edit_cursor, i(), _)))
 
   return {
+    get edit_cursor() {
+      return read(_edit_cursor)
+    },
+    select(i: number) {
+      owrite(_edit_cursor, i)
+    },
     set cursor(cursor: number | undefined) {
       m_bars().forEach((bar, i) => bar.hi = cursor === i)
     },

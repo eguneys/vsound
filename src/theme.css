@@ -18,3 +18,24 @@ box .play {
   background: #111;
   color: white;
 }
+
+list-list label {
+  color: white;
+}
+
+list-list octave span,
+list-list volume span {
+  background: #111;
+  color: white;
+}
+
+list-bar bar {
+  background: #111;
+  color: white;
+
+}
+
+list-bar bar.edit {
+  background: lightyellow;
+  color: black;
+}

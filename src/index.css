@@ -4,6 +4,10 @@ vsound {
   width: 100%;
 }
 
+tabbar {
+  display: flex;
+}
+
 toolbar {
   display: flex;
   justify-content: space-around;
@@ -15,6 +19,18 @@ box {
   justify-content: space-around;
   gap: 0.2em;
   padding: 0.6em;
+}
+
+tabbar label {
+  user-select: none;
+  cursor: pointer;
+  padding: 0 0.2em;
+  color: white;
+  background: black;
+}
+
+tabbar label.active {
+  border-bottom: 2px solid orange;
 }
 
 box .play {
@@ -70,4 +86,36 @@ pitch-bar bar:before {
 
 pitch-bar bar.hi {
   background: lightyellow;
+}
+
+
+list-bar {
+  margin: 0 0.2em;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(8, 1fr);
+}
+
+list-bar bar {
+  margin: 0 0.4em;
+  display: flex;
+  justify-content: center;
+  user-select: none;
+  cursor: pointer;
+}
+
+list-list octave, 
+list-list volume {
+  display: inline-flex;
+  margin: 0.2em;
+  gap: 0.2em;
+}
+
+list-list octave span,
+list-list volume span {
+  padding: 0 0.2em;
+}
+
+list-list .group {
+  margin: 0.2em;
 }
