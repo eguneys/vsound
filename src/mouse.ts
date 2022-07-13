@@ -47,6 +47,9 @@ export default class Mouse {
 
   _bounds: ClientRect
 
+  $clear_bounds() {
+    this._bounds = undefined
+  }
 
   get bounds() {
     if (!this._bounds) {
@@ -119,6 +122,7 @@ export default class Mouse {
       scaleY = 1
 
     if (res) {
+      console.log(res[1], bounds)
       res[0] -= bounds.left
       res[1] -= bounds.top
 

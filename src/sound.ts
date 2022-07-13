@@ -36,7 +36,6 @@ export default class Sound {
 
   constructor($element) {
 
-    this.drag = make_drag(make_hooks(this), $element)
     this.refs = []
     this.speed = make_value(9, 0, 13)
     this.loop = make_loop()
@@ -69,6 +68,16 @@ const make_pitch = (sound: Sound) => {
 
   let ref = make_ref()
   sound.refs.push(ref)
+  let drag
+ 
+ 
+  createEffect(() => {
+    let $ref = ref.$ref
+    if (!drag && $ref) {
+      drag = make_drag(make_hooks(sound), $ref)
+      sound.refs.push(drag)
+    }
+  })
 
   let drag_target = make_position(0, 0)
 
@@ -99,10 +108,17 @@ const make_pitch = (sound: Sound) => {
 
 const make_loop = () => {
 
+  let _mode = createSignal('stop')
   let _begin = createSignal(0)
   let _end = createSignal(0)
 
   return {
+    change_mode() {
+      owrite(_mode, this.mode)
+    },
+    get mode() {
+      return read(_mode) === 'play' ? 'stop': 'play'
+    },
     get begin() {
       return read(_begin)
     },

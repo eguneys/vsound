@@ -49,7 +49,8 @@ export function make_ref() {
         orig = m_orig()
 
       if (size && orig) {
-        return vs.sub(orig).div(size)
+        return vs.div(size)
+        //return vs.sub(orig).div(size)
       }
     }
   }

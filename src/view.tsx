@@ -22,16 +22,17 @@ export const App = sound => props => {
   return (<vsound>
     <toolbar>
     <box>
-      <label>Speed</label> <UpDownControl value={sound.speed.value} setValue={_ => sound.speed.value = _}/>
+      <label>speed</label> <UpDownControl value={sound.speed.value} setValue={_ => sound.speed.value = _}/>
       </box>
    <box>
-      <label>Loop</label> 
+      <label>loop</label> 
       <UpDownControl value={sound.loop.begin} setValue={_ => sound.loop.begin = _}/>
       <UpDownControl value={sound.loop.end} setValue={_ => sound.loop.end = _}/>
+      <label onClick={_ => sound.loop.change_mode()} class='play'>{sound.loop.mode}</label>
     </box>
     </toolbar>
     <pitch-bar ref={_ => setTimeout(() => sound.pitch.ref.$ref = _)}>
-      <For each={console.log(sound.pitch.bars) || sound.pitch.bars}>{ item =>
+      <For each={sound.pitch.bars}>{ item =>
         <Bar style={item.style}/>
       }</For>
     </pitch-bar>
@@ -55,6 +56,6 @@ const UpDownControl = props => {
   
 
   return (<div class='up-down'>
-      <span onClick={_ => value(-1) } class='value-down'>{"<"}</span><span class='value'> {dformat(props.value)} </span> <span onClick={_ => value(+1) } class='value-up'>{">"}</span>
+      <span onClick={_ => value(-1) } class='value-down'>{"<"}</span><span onClick={_ => value(+1) } class='value'> {dformat(props.value)} </span> <span onClick={_ => value(+1) } class='value-up'>{">"}</span>
       </div>)
 }

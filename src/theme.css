@@ -1,5 +1,5 @@
 
-.box label {
+box label {
   color: white;
 }
 
@@ -11,5 +11,10 @@
 .up-down span.value-up,
 .up-down span.value-down {
   background: #121212;
+  color: white;
+}
+
+box .play {
+  background: #111;
   color: white;
 }
