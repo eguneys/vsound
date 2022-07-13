@@ -36,7 +36,9 @@ function make_hooks(sound: Sound) {
 function make_input_hooks(sound: Sound) {
   return {
     piano_bs(bs: [Key, Key, Key]) {
+      let key = bs[sound.controls.octave - 3]
 
+      sound.pitch.press(key)
     }
   }
 }
@@ -98,23 +100,12 @@ const make_tabbar = (sound: Sound) => {
 }
 
 const make_player = (sound: Sound) => {
-
-  let synth = {
-    volume: 1,
-    amplitude: 0.7,
-    cutoff: 0.6,
-    cutoff_max: 0.2,
-    amp_adsr: make_adsr(2, 8, 0.2, 10),
-    filter_adsr: make_adsr(0, 8, 0.2, 0)
-  }
-
-  let player = new PlayerController(synth)
-
   let play_buffer = []
 
   return {
     set cursor(cursor: number) {
       if (cursor !== undefined && !play_buffer.includes(cursor)) {
+        let { player } = sound.pitch.bars[cursor]
         let duration = sound.loop.speed * 16 / 1000
         let note = sound.pitch.bars[cursor].note_value
         let lookaheads = [
@@ -168,9 +159,11 @@ const y_key = [...Array(4).keys()].flatMap(octave => [
 
 const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: number) => {
 
+  let _volume = createSignal(5)
   let _y = createSignal(y)
   let _hi = createSignal(false)
 
+  let m_volume = createMemo(() => read(_volume))
   let m_y = createMemo(() => Math.floor(read(_y) * 48))
   let m_key = createMemo(() => y_key[m_y()])
 
@@ -188,12 +181,34 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     edit_cursor() === i ? 'edit': ''
   ].join(' '))
 
+
+  let m_synth = createMemo(() => ({
+    volume: m_volume()/5,
+    amplitude: 0.7,
+    cutoff: 0.6,
+    cutoff_max: 0.2,
+    amp_adsr: make_adsr(2, 8, 0.2, 10),
+    filter_adsr: make_adsr(0, 8, 0.2, 0)
+  }))
+
+  let m_player = createMemo(() => new PlayerController(m_synth()))
+
   return {
+    get player() {
+      return m_player()
+    },
+    set piano_key(key: PianoKey) {
+      owrite(_y, y_key.indexOf(key)/ 48)
+      owrite(_volume, sound.controls.volume)
+    },
     get note_value() {
       return m_note()
     },
     get note() {
       return note_uci(m_note())
+    },
+    get volume() {
+      return read(_volume)
     },
     get octave() {
       return note_octave(m_note())
@@ -256,6 +271,15 @@ const make_pitch = (sound: Sound) => {
   let m_bars = createMemo(mapArray(_bars[0], (_, i) => make_pitch_bar(sound, m_edit_cursor, i(), _)))
 
   return {
+    press(key: PianoKey) {
+
+      if (!m_edit_cursor()) {
+        owrite(_edit_cursor, 0)
+      }
+
+      m_bars()[m_edit_cursor()].piano_key = key
+      owrite(_edit_cursor, (m_edit_cursor() + 1) % 32)
+    },
     get edit_cursor() {
       return read(_edit_cursor)
     },
