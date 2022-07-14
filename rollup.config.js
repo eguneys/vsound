@@ -33,12 +33,12 @@ export default args => {
     plugins: [
       nodeResolve({ extensions, browser: true }),
       commonjs(),
-      babel({ extensions, babelHelpers: 'bundled' }),
+      string({
+        include: 'lib/**/*.js'
+      }),
+      babel({ extensions, babelHelpers: 'bundled', exclude: 'lib/**' }),
       css({minify: prod }),
       copy({ targets: [{ src: 'assets', dest: 'dist' }], copyOnce: true}),
-      string({
-        include: 'src/pls/*.pl'
-      }),
       htmlTemplate({
         template: 'src/index.html',
         target: 'index.html',

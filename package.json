@@ -4,12 +4,13 @@
   "main": "dist/main.js",
   "license": "MIT",
   "scripts": {
+    "lib": "rm -rf lib && rollup  --config rollup.audiolib.js",
     "clean": "rm -rf dist",
     "lint": "tsc --outDir dist",
     "lint:watch": "tsc --outDir dist --watch",
-    "watch": "yarn -s clean && rollup --config --watch",
+    "watch": "yarn -s clean && yarn lib && rollup --config --watch",
     "build:examples": "yarn -s clean && rollup --config --config-prod",
-    "build": "yarn -s clean && rollup --config --config-prod --format=es"
+    "build": "yarn -s clean && yarn lib && rollup --config --config-prod --format=es"
   },
   "devDependencies": {
     "@babel/core": "^7.18.0",

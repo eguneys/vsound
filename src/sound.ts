@@ -11,6 +11,7 @@ import { index_white, index_black } from './audio/piano'
 import { note_uci } from './audio/uci'
 import { note_octave } from './audio/types'
 import { make_input } from './make_input'
+import { con_synth, synth_con } from './audio/export'
 
 function make_hooks(sound: Sound) {
   return { 
@@ -181,7 +182,6 @@ const make_player = (sound: Sound) => {
         }
 
         duration *= note_duration
-
         let i = player.attack(synth, note, player.currentTime)
         player.release(i, player.currentTime + duration)
 
@@ -255,6 +255,9 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
   let m_player = createMemo(() => new PlayerController())
 
   return {
+    get export() {
+      return [this.note_value, synth_con(this.volume, this.octave, read(_wave))]
+    },
     get synth() {
       return m_synth()
     },
@@ -379,6 +382,15 @@ const make_pitch = (sound: Sound) => {
   let m_bars = createMemo(mapArray(_bars[0], (_, i) => make_pitch_bar(sound, m_edit_cursor, i(), _)))
 
   return {
+    get export() {
+      let begin = sound.loop.begin
+      let end = sound.loop.end
+      if (begin === end) {
+        begin = 0
+        end = 32
+      }
+      return [[sound.loop.speed, ...m_bars().slice(begin, end+1).flatMap(_ => _.export)]]
+    },
     set_all_waves(wave: string) {
       m_bars().forEach(_ => _.wave = wave)
     },

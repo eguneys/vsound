@@ -1,4 +1,5 @@
-import { onCleanup } from 'solid-js'
+import { createSignal, onCleanup } from 'solid-js'
+import audiolib_code from '../lib/vsound.min.js'
 
 function unbindable(
   el: EventTarget,
@@ -51,7 +52,7 @@ export const App = sound => props => {
     </statusbar>
     <Show when={sound.overlay}>{value => 
     <overlay onClick={e => e.stopPropagation()}>
-      <Dynamic component={overlays[value]}/>
+      <Dynamic sound={sound} component={overlays[value]}/>
     </overlay>
     }</Show>
     </vsound>)
@@ -59,9 +60,62 @@ export const App = sound => props => {
 
 
 const Export = props => {
+  let data_res = `let data = ${JSON.stringify(props.sound.pitch.export)}`
   return (<export>
-    Export
+   <h2> Export</h2>
+
+    <p>
+    <span> Data </span>
+    <CopyCode>
+    {data_res}
+    </CopyCode>
+    </p>
+
+    <h3> Usage </h3>
+    <p>
+    <span>// Include Player Library</span><br/>
+    <span>// Include Data</span><br/>
+    <span>// Then use it like</span><br/>
+      <CopyCode>
+      let p = VSound(data); p(0) // play a sound by index
+        </CopyCode>
+    </p>
+    <p>
+    <span> Player Library </span>
+    <CopyCode>
+     {audiolib_code} 
+    </CopyCode>
+    </p>
       </export>)
+}
+
+const CopyCode = props => {
+  let text = createSignal('copy')
+
+
+  function copy() {
+
+    navigator.clipboard.writeText(props.children).then(function() {
+
+        text[1]('copied')
+
+        setTimeout(() => {
+
+            text[1]('copy')
+            }, 1000)
+
+        }, function(err) {
+        console.error('Async: Could not copy text: ', err);
+        }); 
+
+  }
+
+  return (<copycode>
+  <span onClick={_ => copy() }>{text[0]()}</span>
+  <code>
+   {props.children}
+   </code>
+   </copycode>)
 }
 
 const Help = props => {

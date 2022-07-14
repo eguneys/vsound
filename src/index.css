@@ -167,7 +167,8 @@ help footer {
 }
 
 
-vsound h2 {
+vsound h2,
+vsound h3 {
   padding: 0;
   margin: 0;
 }
@@ -201,4 +202,37 @@ box .help {
   user-select: none;
   cursor: pointer;
   padding: 0 0.2em;
+}
+
+overlay {
+  box-sizing: border-box;
+  display: flex;
+}
+
+export {
+  width: 90%;
+  display: flex;
+  flex-flow: column;
+}
+
+export code {
+  box-sizing: border-box;
+  padding: 1em;
+  margin: 1em;
+  width: 100%;
+  display: flex;
+  overflow-x:auto;
+}
+
+copycode {
+  position: relative;
+}
+
+
+copycode span {
+  position: absolute;
+  top: 0;
+  right: 0;
+  user-select: none;
+  cursor: pointer;
 }

@@ -107,3 +107,7 @@ box .export {
   background: #111;
   color: white;
 }
+
+export code {
+  background: #100;
+}
