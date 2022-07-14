@@ -13,6 +13,7 @@ import { note_octave } from './audio/types'
 import { make_input } from './make_input'
 import { con_synth, synth_con } from './audio/export'
 
+
 function make_hooks(sound: Sound) {
   return { 
     on_hover() {

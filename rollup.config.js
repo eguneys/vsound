@@ -12,6 +12,9 @@ import livereload from 'rollup-plugin-livereload'
 
 import { string } from 'rollup-plugin-string'
 
+import replace from '@rollup/plugin-replace'
+import packageJson from './package.json'
+
 let extensions = ['.ts', '.tsx']
 
 export default args => {
@@ -31,6 +34,12 @@ export default args => {
       clearScreen: true
     },
     plugins: [
+      replace({
+        preventAssignment: true,
+        values: {
+          '__VERSION__': packageJson.version
+        }
+      }),
       nodeResolve({ extensions, browser: true }),
       commonjs(),
       string({

@@ -120,7 +120,7 @@ const CopyCode = props => {
 
 const Help = props => {
   return (<help>
-   <h2> V Sound v0.9 </h2>
+   <h2> V Sound v{`${"__VERSION__"}`}</h2>
    <small>Designed to export sound effects with small size for use in JS13k.</small>
    <p>
      <span> Inspired by PICO-8 </span>
