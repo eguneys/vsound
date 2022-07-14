@@ -32,6 +32,25 @@ function make_hooks(sound: Sound) {
   }
 }
 
+function make_vhooks(sound: Sound) {
+  return { 
+    on_hover() {
+    },
+    on_up(decay) {
+    },
+    on_click(click: [number, number]) {
+      sound.pitch.find_on_volume_start(Vec2.make(...click))
+    },
+    find_inject_drag() {
+    },
+    on_drag_update(decay) {
+      sound.pitch.find_on_volume_start(decay.drag_move)
+    },
+    find_on_drag_start(drag) {
+      return sound.pitch.find_on_volume_start(Vec2.make(...drag.move))
+    }
+  }
+}
 
 function make_input_hooks(sound: Sound) {
   return {
@@ -87,7 +106,7 @@ const make_controls = (sound: Sound) => {
 
 const make_tabbar = (sound: Sound) => {
 
-  let _active = createSignal('list')
+  let _active = createSignal('graph')
 
   return {
     set active(active: string) {
@@ -99,12 +118,17 @@ const make_tabbar = (sound: Sound) => {
   }
 }
 
+function merge_notes(a: PitchBar, b: PitchBar) {
+  return a.note_value === b.note_value && a.volume === b.volume
+}
+
 const make_player = (sound: Sound) => {
   let play_buffer = []
 
   return {
     set cursor(cursor: number) {
       if (cursor !== undefined && !play_buffer.includes(cursor)) {
+        let cbar = sound.pitch.bars[cursor]
         let { player } = sound.pitch.bars[cursor]
         let duration = sound.loop.speed * 16 / 1000
         let note = sound.pitch.bars[cursor].note_value
@@ -114,20 +138,20 @@ const make_player = (sound: Sound) => {
           [cursor + 1]
         ].map(lookahead =>
               lookahead.filter(_ => _ < 32)
-              .map(_ => sound.pitch.bars[_].note_value))
+              .map(_ => sound.pitch.bars[_]))
 
         let note_duration = 1
 
         if (lookaheads[0].length === 3 &&
-            lookaheads[0].every(_ => _ === note)) {
+            lookaheads[0].every(_ => merge_notes(cbar, _))) {
             note_duration = 4
             play_buffer = [cursor + 1, cursor + 2, cursor + 3]
         } else if (lookaheads[1].length === 2 &&
-                   lookaheads[1].every(_ => _ === note)) {
+                   lookaheads[1].every(_ => merge_notes(cbar, _))) {
             note_duration = 3
             play_buffer = [cursor + 1, cursor + 2]
         } else if (lookaheads[2].length === 1 &&
-                   lookaheads[2].every(_ => _ === note)) {
+                   lookaheads[2].every(_ => merge_notes(cbar, _))) {
             note_duration = 2
             play_buffer = [cursor + 1]
         }
@@ -157,6 +181,7 @@ const y_key = [...Array(4).keys()].flatMap(octave => [
   index_white(6 + octave * 7)
 ])
 
+const volume_klass = ['zero', 'one', 'two', 'three', 'four', 'five']
 const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: number) => {
 
   let _volume = createSignal(5)
@@ -179,6 +204,15 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
 
   let m_lklass = createMemo(() => [
     edit_cursor() === i ? 'edit': ''
+  ].join(' '))
+
+
+  let m_vstyle = createMemo(() => ({
+    height: `${read(_volume)/5*100}%`
+  }))
+
+  let m_vklass = createMemo(() => [
+    volume_klass[read(_volume)]
   ].join(' '))
 
 
@@ -219,6 +253,10 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     set hi(v: boolean) {
       owrite(_hi, v)
     },
+    set vy(y: value) {
+      y = Math.round(y * 5)
+      owrite(_volume, y)
+    },
     set y(y: value) {
       y = Math.floor(y * 48) / 48
       owrite(_y, y)
@@ -232,6 +270,12 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     get style() {
       return m_style()
     },
+    get vklass() {
+      return m_vklass()
+    },
+    get vstyle() {
+      return m_vstyle()
+    },
     select() {
       sound.pitch.select(i)
     }
@@ -241,13 +285,29 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
 
 const make_pitch = (sound: Sound) => {
 
+  let vref = make_ref()
+  sound.refs.push(vref)
+  let vdrag
+
+  createEffect(() => {
+    let $ref = vref.$ref
+    if ($ref) {
+      if (vdrag) {
+        sound.refs.splice(sound.refs.indexOf(vdrag), 1)
+      }
+      vdrag = make_drag(make_vhooks(sound), $ref)
+      sound.refs.push(vdrag)
+    }
+  })
+
+
+
+
+
   let ref = make_ref()
   sound.refs.push(ref)
   let drag
- 
- 
-  let _edit_cursor = createSignal()
-  let m_edit_cursor = createMemo(() => read(_edit_cursor))
+  let drag_target = make_position(0, 0)
 
   createEffect(() => {
     let $ref = ref.$ref
@@ -260,10 +320,16 @@ const make_pitch = (sound: Sound) => {
     }
   })
 
-  let drag_target = make_position(0, 0)
+
+  let _edit_cursor = createSignal()
+  let m_edit_cursor = createMemo(() => read(_edit_cursor))
 
   function set_y(n: number, y: number) {
     m_bars()[n].y = y
+  }
+
+  function set_vy(n: number, y: number) {
+    m_bars()[n].vy = y
   }
 
   let _bars = createSignal([...Array(32).keys()].map(_ => 0.5))
@@ -292,6 +358,14 @@ const make_pitch = (sound: Sound) => {
     get bars() {
       return m_bars()
     },
+    find_on_volume_start(drag: Vec2) {
+      let res = vref.get_normal_at_abs_pos(drag)
+      if (0 <= res.x && res.x <= 1 && 0 <= res.y && res.y <= 1.0) {
+        let i = res.x * 32
+        set_vy(Math.floor(i), 1-res.y)
+        return drag_target
+      }
+    },
     find_on_drag_start(drag: Vec2) {
       let res = ref.get_normal_at_abs_pos(drag)
       if (0 <= res.x && res.x <= 1 && 0 <= res.y && res.y <= 1.0) {
@@ -300,7 +374,8 @@ const make_pitch = (sound: Sound) => {
         return drag_target
       }
     },
-    ref
+    ref,
+    vref
   }
 
 }

@@ -44,3 +44,34 @@ list-bar bar.hi {
   background: yellow;
   color: black;
 }
+
+vsound label {
+  color: white;
+}
+
+
+statusbar {
+  background: pink;
+}
+
+
+vbar.one:before {
+  background: white;
+}
+
+vbar.two:before {
+  background: lightblue;
+}
+
+
+vbar.three:before {
+  background: pink;
+}
+
+vbar.four:before {
+  background: lightyellow;
+}
+
+vbar.five:before {
+  background: lightgreen;
+}

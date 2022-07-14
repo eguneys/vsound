@@ -59,10 +59,25 @@ box .play {
 
 }
 
+volume-bar {
+  flex: 1;
+}
+
 pitch-bar {
+  flex: 4;
+}
+
+list-list, list-bar {
+  flex: 1;
+}
+list-list {
+  display: flex;
+  flex-flow: column;
+}
+
+pitch-bar, volume-bar {
   user-select: none;
   cursor: pointer;
-  aspect-ratio: 16/9;
   margin: 1em 0.2em;
   display: grid;
   grid-auto-flow: column;
@@ -71,12 +86,17 @@ pitch-bar {
   gap: 1%;
 }
 
+volume-bar vbar {
+  position: relative;
+}
+
 pitch-bar bar {
   position: relative;
   background: lightblue;
 }
 
-pitch-bar bar:before {
+pitch-bar bar:before,
+volume-bar vbar:before {
   position: absolute;
   content: '';
   background: gray;
@@ -100,6 +120,7 @@ list-bar bar {
   margin: 0 0.4em;
   display: flex;
   justify-content: center;
+  align-items: center;
   user-select: none;
   cursor: pointer;
 }

@@ -36,16 +36,28 @@ export const App = sound => props => {
     </box>
     </toolbar>
     <Dynamic sound={sound} component={comps[sound.tabbar.active]}/>
+    <statusbar>
+      <span>&nbsp</span>
+    </statusbar>
     </vsound>)
 }
 
 const PitchBar = props => {
 let { sound } = props
-  return (<pitch-bar ref={_ => setTimeout(() => sound.pitch.ref.$ref = _)}>
-    <For each={sound.pitch.bars}>{ item =>
-      <Bar item={item}/>
-    }</For>
-  </pitch-bar>)
+  return (<>
+    <label>:pitch</label>
+    <pitch-bar ref={_ => setTimeout(() => sound.pitch.ref.$ref = _)}>
+       <For each={sound.pitch.bars}>{ item =>
+         <Bar item={item}/>
+       }</For>
+    </pitch-bar>
+    <label>:volume</label>
+    <volume-bar ref={_ => setTimeout(() => sound.pitch.vref.$ref = _)}>
+       <For each={sound.pitch.bars}>{ item =>
+         <VolumeBar item={item}/>
+       }</For>
+    </volume-bar>
+  </>)
 }
 
 const ListBar = props => {
@@ -96,6 +108,10 @@ const LBar = props => {
 const Bar = props => {
 
   return <bar class={props.item.klass} style={props.item.style}></bar>
+}
+
+const VolumeBar = props => {
+  return <vbar class={props.item.vklass} style={props.item.vstyle}></vbar>
 }
 
 const dformat = v => v < 10 ? `0${v}` : `${v}`
