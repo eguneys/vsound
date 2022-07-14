@@ -23,7 +23,7 @@ function make_hooks(sound: Sound) {
     },
     find_inject_drag() {
     },
-    on_drag_update(decay) {
+    on_drag_update(decay: Decay) {
       sound.pitch.find_on_drag_start(decay.drag_move)
     },
     find_on_drag_start(drag) {
@@ -444,11 +444,19 @@ const make_loop = (sound: Sound) => {
       let cancel = loop((dt: number, dt0: number) => {
         i += dt
 
+        let begin = read(_begin)
+        let end = read(_end)
         let dur = m_one_duration()
 
         if (i > dur) {
           i -= dur
-          owrite(_cursor, _ => (_ + 1) % 32)
+          owrite(_cursor, _ => {
+            let res = (_ + 1) % 32
+            if (begin !== end && res > end || (res === 31 && end === 31)) {
+              res = begin
+            }
+            return res
+          })
         }
       })
 
@@ -484,13 +492,13 @@ const make_loop = (sound: Sound) => {
       return read(_begin)
     },
     set begin(v: number) {
-      owrite(_begin, (v + 33) % 33)
+      owrite(_begin, (v + 32) % 32)
     },
     get end() {
       return read(_end)
     },
     set end(v: number) {
-      owrite(_end, (v + 33) % 33)
+      owrite(_end, (v + 32) % 32)
     }
   }
 }
