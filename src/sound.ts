@@ -95,9 +95,15 @@ const make_controls = (sound: Sound) => {
     },
     set wave(wave: string) {
       owrite(_wave, wave)
+      if (sound.input.btn('Shift', true)) {
+        sound.pitch.set_all_waves(wave)
+      }
     },
     set volume(volume: number) {
       owrite(_volume, volume)
+      if (sound.input.btn('Shift', true)) {
+        sound.pitch.set_all_volume(volume)
+      }
     },
     get volume() {
       return read(_volume)
@@ -136,7 +142,7 @@ const make_player = (sound: Sound) => {
     set cursor(cursor: number) {
       if (cursor !== undefined && !play_buffer.includes(cursor)) {
         let cbar = sound.pitch.bars[cursor]
-        let { player } = sound.pitch.bars[cursor]
+        let { player, synth } = sound.pitch.bars[cursor]
         let duration = sound.loop.speed * 16 / 1000
         let note = sound.pitch.bars[cursor].note_value
         let lookaheads = [
@@ -161,11 +167,13 @@ const make_player = (sound: Sound) => {
                    lookaheads[2].every(_ => merge_notes(cbar, _))) {
             note_duration = 2
             play_buffer = [cursor + 1]
+        } else {
+          play_buffer = []
         }
 
         duration *= note_duration
 
-        let i = player.attack(note, player.currentTime)
+        let i = player.attack(synth, note, player.currentTime)
         player.release(i, player.currentTime + duration)
 
       }
@@ -235,9 +243,18 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     filter_adsr: make_adsr(0, 8, 0.2, 0)
   }))
 
-  let m_player = createMemo(() => new PlayerController(m_synth()))
+  let m_player = createMemo(() => new PlayerController())
 
   return {
+    get synth() {
+      return m_synth()
+    },
+    set volume(volume: Volume) {
+      owrite(_volume, volume)
+    },
+    set wave(wave: Wave) {
+      owrite(_wave, wave)
+    },
     get wave() {
       return read(_wave).slice(0, 3)
     },
@@ -353,6 +370,12 @@ const make_pitch = (sound: Sound) => {
   let m_bars = createMemo(mapArray(_bars[0], (_, i) => make_pitch_bar(sound, m_edit_cursor, i(), _)))
 
   return {
+    set_all_waves(wave: string) {
+      m_bars().forEach(_ => _.wave = wave)
+    },
+    set_all_volume(volume: string) {
+      m_bars().forEach(_ => _.volume = volume)
+    },
     press(key: PianoKey) {
 
       if (!m_edit_cursor()) {

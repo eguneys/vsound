@@ -85,3 +85,14 @@ vbar.four:before {
 vbar.five:before {
   background: lightgreen;
 }
+
+
+label.pitch {
+  background: lightblue;
+  color: black;
+}
+
+label.volume {
+  background: lightgreen;
+  color: black;
+}

@@ -88,12 +88,9 @@ export class PlayerController {
 
   players: Map<number, HasAudioAnalyser> = new Map()
 
-  constructor(readonly synth: Synth) {
-  }
+  attack(synth: Synth, note: Note, time: number = 0) {
 
-  attack(note: Note, time: number = 0) {
-
-    let { next_id, synth } = this
+    let { next_id } = this
 
     this.players.set(next_id, new MidiPlayer(this.context)
                      ._set_data({

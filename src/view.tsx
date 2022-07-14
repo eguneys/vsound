@@ -51,13 +51,13 @@ export const App = sound => props => {
 const PitchBar = props => {
 let { sound } = props
   return (<>
-    <label>:pitch</label>
+    <label class='pitch'>:pitch</label>
     <pitch-bar ref={_ => setTimeout(() => sound.pitch.ref.$ref = _)}>
        <For each={sound.pitch.bars}>{ item =>
          <Bar item={item}/>
        }</For>
     </pitch-bar>
-    <label>:volume</label>
+    <label class='volume'>:volume</label>
     <volume-bar ref={_ => setTimeout(() => sound.pitch.vref.$ref = _)}>
        <For each={sound.pitch.bars}>{ item =>
          <VolumeBar item={item}/>

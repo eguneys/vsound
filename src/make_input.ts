@@ -23,4 +23,5 @@ export function make_input(hooks: InputHooks) {
 
   })
 
+  return input
 }
