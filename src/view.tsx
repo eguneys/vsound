@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from 'solid-js'
-import audiolib_code from '../lib/vsound.min.js'
+import audiolib_code from '../lib/vsound.js'
 
 function unbindable(
   el: EventTarget,

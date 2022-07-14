@@ -84,7 +84,6 @@ export default function VSound(data: Array<any>) {
         let id = player.attack(synth, note, ttt)
         player.release(id, ttt + duration)
 
-        console.log(synth, duration, ttt)
         ttt += duration
     }
   }

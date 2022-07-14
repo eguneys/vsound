@@ -12,7 +12,7 @@ export default args => {
     output: {
       format: 'iife',
       name: 'VSound',
-      file: 'lib/vsound.min.js',
+      file: 'lib/vsound.js',
     banner: `
 /*
 
