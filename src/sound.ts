@@ -226,13 +226,15 @@ function merge_notes(a: PitchBar, b: PitchBar) {
 }
 
 const make_player = (sound: Sound) => {
+
+  let player = new PlayerController()
   let play_buffer = []
 
   return {
     set cursor(cursor: number) {
       if (cursor !== undefined && !play_buffer.includes(cursor)) {
         let cbar = sound.pitch.bars[cursor]
-        let { player, synth } = sound.pitch.bars[cursor]
+        let { synth } = sound.pitch.bars[cursor]
         let duration = sound.loop.speed * 16 / 1000
         let note = sound.pitch.bars[cursor].note_value
         let lookaheads = [
@@ -332,8 +334,6 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     filter_adsr: make_adsr(0, 8, 0.2, 0)
   }))
 
-  let m_player = createMemo(() => new PlayerController())
-
   return {
     get export() {
       return [this.note_value, synth_con(this.volume, this.octave, read(_wave)), this.volume]
@@ -349,9 +349,6 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     },
     get wave() {
       return read(_wave).slice(0, 3)
-    },
-    get player() {
-      return m_player()
     },
     set piano_key(key: PianoKey) {
       owrite(_y, y_key.indexOf(key)/ 48)

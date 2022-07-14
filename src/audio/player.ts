@@ -124,11 +124,12 @@ abstract class HasAudioAnalyser {
     let { context } = this
 
     this.gain = context.createGain()
-    this.analyser = context.createAnalyser()
+    //this.analyser = context.createAnalyser()
 
     this.gain.gain.setValueAtTime(1, time)
-    this.gain!.connect(this.analyser)
-    this.analyser.connect(context.destination)
+    this.gain!.connect(context.destination)
+    //this.gain!.connect(this.analyser)
+    //this.analyser.connect(context.destination)
 
     this._attack(time)
     return this
@@ -239,6 +240,7 @@ export class MidiPlayer extends HasAudioAnalyser {
       now,
       filter_adsr,
       cutoff * this.maxFilterFreq * 0.4)
+
     this.osc1.stop(now + a + d + _r)
     this.osc2.stop(now + a + d + _r)
   }
