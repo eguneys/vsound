@@ -34,6 +34,12 @@ export const App = sound => props => {
       <UpDownControl value={sound.loop.end} setValue={_ => sound.loop.end = _}/>
       <label onClick={_ => sound.loop.change_mode()} class='play'>{sound.loop.mode}</label>
     </box>
+    <box class='wave'>
+      <label>wave</label>
+      <For each={['sine','square','triangle','sawtooth']}>{ i =>
+         <span onClick={_ => sound.controls.wave = i} class={sound.controls.wave===i ? 'active':''}>{i.slice(0, 3)}</span>
+      }</For>
+    </box>
     </toolbar>
     <Dynamic sound={sound} component={comps[sound.tabbar.active]}/>
     <statusbar>

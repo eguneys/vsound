@@ -24,10 +24,20 @@ list-list label {
 }
 
 list-list octave span,
-list-list volume span {
+list-list volume span,
+box.wave span {
   background: #111;
   color: white;
 }
+
+list-list octave span.active,
+list-list volume span.active,
+box.wave span.active {
+  background: lightyellow;
+  color: black;
+}
+
+
 
 list-bar bar {
   background: #111;

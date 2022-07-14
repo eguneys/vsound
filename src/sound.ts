@@ -87,8 +87,15 @@ const make_controls = (sound: Sound) => {
 
   let _octave = createSignal(4)
   let _volume = createSignal(5)
+  let _wave = createSignal('sine')
 
   return {
+    get wave() {
+      return read(_wave)
+    },
+    set wave(wave: string) {
+      owrite(_wave, wave)
+    },
     set volume(volume: number) {
       owrite(_volume, volume)
     },
@@ -119,7 +126,7 @@ const make_tabbar = (sound: Sound) => {
 }
 
 function merge_notes(a: PitchBar, b: PitchBar) {
-  return a.note_value === b.note_value && a.volume === b.volume
+  return a.note_value === b.note_value && a.volume === b.volume && a.wave === b.wave
 }
 
 const make_player = (sound: Sound) => {
@@ -184,10 +191,12 @@ const y_key = [...Array(4).keys()].flatMap(octave => [
 const volume_klass = ['zero', 'one', 'two', 'three', 'four', 'five']
 const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: number) => {
 
+  let _wave = createSignal('triangle')
   let _volume = createSignal(5)
   let _y = createSignal(y)
   let _hi = createSignal(false)
 
+  let m_wave = createMemo(() => read(_wave))
   let m_volume = createMemo(() => read(_volume))
   let m_y = createMemo(() => Math.floor(read(_y) * 48))
   let m_key = createMemo(() => y_key[m_y()])
@@ -217,8 +226,9 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
 
 
   let m_synth = createMemo(() => ({
+    wave: m_wave(),
     volume: m_volume()/5,
-    amplitude: 0.7,
+    amplitude: 0.9,
     cutoff: 0.6,
     cutoff_max: 0.2,
     amp_adsr: make_adsr(2, 8, 0.2, 10),
@@ -228,12 +238,16 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
   let m_player = createMemo(() => new PlayerController(m_synth()))
 
   return {
+    get wave() {
+      return read(_wave).slice(0, 3)
+    },
     get player() {
       return m_player()
     },
     set piano_key(key: PianoKey) {
       owrite(_y, y_key.indexOf(key)/ 48)
       owrite(_volume, sound.controls.volume)
+      owrite(_wave, sound.controls.wave)
     },
     get note_value() {
       return m_note()
@@ -260,6 +274,8 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
     set y(y: value) {
       y = Math.floor(y * 48) / 48
       owrite(_y, y)
+      owrite(_volume, sound.controls.volume)
+      owrite(_wave, sound.controls.wave)
     },
     get y() {
       return read(_y)

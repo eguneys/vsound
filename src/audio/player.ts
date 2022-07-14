@@ -1,6 +1,7 @@
 import { Note, note_pitch, note_octave, note_accidental } from './types'
 
 export type Synth = {
+  wave: string,
   amplitude: number,
   cutoff: number,
   cutoff_max: number,
@@ -146,6 +147,9 @@ abstract class HasAudioAnalyser {
   abstract _release(time: number): void
 }
 
+function getOscillator(context: AudioContext, type: string) {
+  return new OscillatorNode(context, { type })
+}
 
 export class MidiPlayer extends HasAudioAnalyser {
 
@@ -168,12 +172,12 @@ export class MidiPlayer extends HasAudioAnalyser {
 
     let { freq, synth } = this.data
 
-    let { volume, cutoff, cutoff_max, amplitude, filter_adsr, amp_adsr } = synth
+    let { wave, volume, cutoff, cutoff_max, amplitude, filter_adsr, amp_adsr } = synth
 
-    let osc1 = new OscillatorNode(context, { type: 'sawtooth' })
+    let osc1 = getOscillator(context, wave)
     this.osc1 = osc1
 
-    let osc2 = new OscillatorNode(context, { type: 'sawtooth' })
+    let osc2 = getOscillator(context, wave)
     this.osc2 = osc2
 
 

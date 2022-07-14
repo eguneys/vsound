@@ -123,6 +123,7 @@ list-bar bar {
   align-items: center;
   user-select: none;
   cursor: pointer;
+  gap: 0.2em;
 }
 
 list-list octave, 
@@ -139,12 +140,12 @@ list-list volume span {
   padding: 0 0.2em;
 }
 
-list-list octave span.active,
-list-list volume span.active {
-  background: lightyellow;
-  color: black;
-}
-
 list-list .group {
   margin: 0.2em;
+}
+
+box.wave span {
+  user-select: none;
+  cursor: pointer;
+  padding: 0 0.2em;
 }
