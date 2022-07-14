@@ -79,8 +79,32 @@ export default class Sound {
     owrite(this._overlay, overlay)
   }
 
+  get i() {
+    return read(this._i)
+  }
+
+  set i(i: number) {
+    if (i >= 0 && i < this._loops.length) {
+      owrite(this._i, i)
+    }
+  }
+
+  get loop() {
+    return this.m_loop()
+  }
+
+  get pitch() {
+    return this.m_pitch()
+  }
+
+
+  get export() {
+    return this._loops.map(_ => _.pitch.export).filter(_ => _.length > 1)
+  }
+
   constructor($element) {
 
+    this._i = createSignal(0)
     this._overlay = createSignal()
     this.input = make_input(make_input_hooks(this))
 
@@ -88,8 +112,63 @@ export default class Sound {
     this.controls = make_controls(this)
     this.tabbar = make_tabbar(this)
     this.player = make_player(this)
-    this.pitch = make_pitch(this)
-    this.loop = make_loop(this)
+
+    this._loops = [...Array(24).keys()].map(i => ({
+      loop: make_loop(this, i),
+      pitch: make_pitch(this, i)
+    }))
+
+    let m_loops = createMemo(() => this._loops[read(this._i)])
+
+    this.m_loop = createMemo(() => m_loops().loop)
+    this.m_pitch = createMemo(() => m_loops().pitch)
+
+    createEffect(() => {
+      let cursor = this.loop.cursor
+      this.pitch.cursor = cursor
+      this.player.cursor = cursor
+    })
+
+
+
+    let sound = this
+
+    let vref = make_ref()
+    sound.refs.push(vref)
+    let vdrag
+
+    createEffect(() => {
+      let $ref = vref.$ref
+      if ($ref) {
+        if (vdrag) {
+          sound.refs.splice(sound.refs.indexOf(vdrag), 1)
+        }
+        vdrag = make_drag(make_vhooks(sound), $ref)
+        sound.refs.push(vdrag)
+      }
+    })
+
+    let ref = make_ref()
+    sound.refs.push(ref)
+    let drag
+
+    createEffect(() => {
+      let $ref = ref.$ref
+      if ($ref) {
+        if (drag) {
+          sound.refs.splice(sound.refs.indexOf(drag), 1)
+        }
+        drag = make_drag(make_hooks(sound), $ref)
+        sound.refs.push(drag)
+      }
+    })
+
+
+
+    this.pitch_ref = ref
+    this.pitch_vref = vref
+
+
   }
 }
 
@@ -210,7 +289,7 @@ const volume_klass = ['zero', 'one', 'two', 'three', 'four', 'five']
 const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: number) => {
 
   let _wave = createSignal('triangle')
-  let _volume = createSignal(5)
+  let _volume = createSignal(0)
   let _y = createSignal(y)
   let _hi = createSignal(false)
 
@@ -257,7 +336,7 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
 
   return {
     get export() {
-      return [this.note_value, synth_con(this.volume, this.octave, read(_wave))]
+      return [this.note_value, synth_con(this.volume, this.octave, read(_wave)), this.volume]
     },
     get synth() {
       return m_synth()
@@ -329,43 +408,26 @@ const make_pitch_bar = (sound: Sound, edit_cursor: Signal<any>, i: number, y: nu
   }
 }
 
+function trim_end_export(e: Array<BarExport>) {
+  let res = []
+
+  let i = e.length - 1
+  for (; i >= 0; i--) {
+    if (e[i][2] !== 0) {
+      break
+    }
+  }
+
+  for (; i >= 0; i--) {
+    res.unshift(e[i].slice(0, 2))
+  }
+
+  return res
+}
+
 const make_pitch = (sound: Sound) => {
 
-  let vref = make_ref()
-  sound.refs.push(vref)
-  let vdrag
-
-  createEffect(() => {
-    let $ref = vref.$ref
-    if ($ref) {
-      if (vdrag) {
-        sound.refs.splice(sound.refs.indexOf(vdrag), 1)
-      }
-      vdrag = make_drag(make_vhooks(sound), $ref)
-      sound.refs.push(vdrag)
-    }
-  })
-
-
-
-
-
-  let ref = make_ref()
-  sound.refs.push(ref)
-  let drag
   let drag_target = make_position(0, 0)
-
-  createEffect(() => {
-    let $ref = ref.$ref
-    if ($ref) {
-      if (drag) {
-        sound.refs.splice(sound.refs.indexOf(drag), 1)
-      }
-      drag = make_drag(make_hooks(sound), $ref)
-      sound.refs.push(drag)
-    }
-  })
-
 
   let _edit_cursor = createSignal()
   let m_edit_cursor = createMemo(() => read(_edit_cursor))
@@ -390,7 +452,10 @@ const make_pitch = (sound: Sound) => {
         begin = 0
         end = 32
       }
-      return [[sound.loop.speed, ...m_bars().slice(begin, end+1).flatMap(_ => _.export)]]
+      let bars = m_bars().slice(begin, end+1).map(_ => _.export)
+
+      bars = trim_end_export(bars)
+      return [sound.loop.speed, ...bars.flat()]
     },
     set_all_waves(wave: string) {
       m_bars().forEach(_ => _.wave = wave)
@@ -420,7 +485,7 @@ const make_pitch = (sound: Sound) => {
       return m_bars()
     },
     find_on_volume_start(drag: Vec2) {
-      let res = vref.get_normal_at_abs_pos(drag)
+      let res = sound.pitch_vref.get_normal_at_abs_pos(drag)
       if (0 <= res.x && res.x <= 1 && 0 <= res.y && res.y <= 1.0) {
         let i = res.x * 32
         set_vy(Math.floor(i), 1-res.y)
@@ -428,20 +493,18 @@ const make_pitch = (sound: Sound) => {
       }
     },
     find_on_drag_start(drag: Vec2) {
-      let res = ref.get_normal_at_abs_pos(drag)
+      let res = sound.pitch_ref.get_normal_at_abs_pos(drag)
       if (0 <= res.x && res.x <= 1 && 0 <= res.y && res.y <= 1.0) {
         let i = res.x * 32
         set_y(Math.floor(i), 1-res.y)
         return drag_target
       }
-    },
-    ref,
-    vref
+    }
   }
 
 }
 
-const make_loop = (sound: Sound) => {
+const make_loop = (sound: Sound, i: number) => {
 
   let _speed = createSignal(9)
 
@@ -458,8 +521,8 @@ const make_loop = (sound: Sound) => {
     return i * 16 
   })
 
-  createEffect(on(_mode[0], (value) => {
-    if (value === 'play') {
+  createEffect(on(() => [sound.i, _mode[0]()], ([_i, value]) => {
+    if (i === _i && value === 'play') {
 
       owrite(_cursor, read(_begin))
       let i = 0
@@ -489,17 +552,15 @@ const make_loop = (sound: Sound) => {
     }
   }))
 
-  createEffect(() => {
-    let cursor = read(_cursor)
-    sound.pitch.cursor = cursor
-    sound.player.cursor = cursor
-  })
   return {
     set speed(speed: number) {
       if (speed < 1 || speed > 20) {
         return
       }
       owrite(_speed, speed)
+    },
+    get cursor() {
+      return read(_cursor)
     },
     get speed() {
       return read(_speed)

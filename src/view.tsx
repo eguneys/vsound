@@ -27,6 +27,9 @@ export const App = sound => props => {
     </tabbar>
     <toolbar>
     <box>
+    <label>i</label> <UpDownControl value={sound.i} setValue={_ => sound.i = _}/>
+    </box>
+    <box>
       <label>speed</label> <UpDownControl value={sound.loop.speed} setValue={_ => sound.loop.speed = _}/>
       </box>
    <box>
@@ -60,7 +63,7 @@ export const App = sound => props => {
 
 
 const Export = props => {
-  let data_res = `let data = ${JSON.stringify(props.sound.pitch.export)}`
+  let data_res = `let data = ${JSON.stringify(props.sound.export)}`
   return (<export>
    <h2> Export</h2>
 
@@ -153,13 +156,13 @@ const PitchBar = props => {
 let { sound } = props
   return (<>
     <label class='pitch'>:pitch</label>
-    <pitch-bar ref={_ => setTimeout(() => sound.pitch.ref.$ref = _)}>
+    <pitch-bar ref={_ => setTimeout(() => sound.pitch_ref.$ref = _)}>
        <For each={sound.pitch.bars}>{ item =>
          <Bar item={item}/>
        }</For>
     </pitch-bar>
     <label class='volume'>:volume</label>
-    <volume-bar ref={_ => setTimeout(() => sound.pitch.vref.$ref = _)}>
+    <volume-bar ref={_ => setTimeout(() => sound.pitch_vref.$ref = _)}>
        <For each={sound.pitch.bars}>{ item =>
          <VolumeBar item={item}/>
        }</For>
@@ -205,10 +208,20 @@ const LBar = props => {
  const or_dot = (_) => !!_ ? _ : '.'
 
   return <bar onClick={_ => props.item.select()} class={[props.item.klass, props.item.lklass].join(' ')}>
+    <Show when={props.item.volume===0}
+fallback={
+<>
     <span>{or_dot(props.item.note)}</span>
     <span>{or_dot(props.item.octave)}</span>
     <span>{or_dot(props.item.wave)}</span>
     <span>{or_dot(props.item.volume)}</span>
+</>
+}> 
+    <span>.</span>
+    <span>.</span>
+    <span>.</span>
+    <span>.</span>
+</Show>
     </bar>
 }
 
