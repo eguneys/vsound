@@ -9,7 +9,7 @@
     "lint": "tsc --outDir dist",
     "lint:watch": "tsc --outDir dist --watch",
     "watch": "yarn -s clean && yarn lib && rollup --config --watch",
-    "build:examples": "yarn -s clean && rollup --config --config-prod",
+    "build:examples": "yarn -s clean && yarn lib && rollup --config --config-prod",
     "build": "yarn -s clean && yarn lib && rollup --config --config-prod --format=es"
   },
   "devDependencies": {
