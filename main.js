@@ -2230,15 +2230,81 @@ var VSound = (function () {
       owrite(this._overlay, overlay);
     }
 
+    get i() {
+      return read(this._i);
+    }
+
+    set i(i) {
+      if (i >= 0 && i < this._loops.length) {
+        owrite(this._i, i);
+      }
+    }
+
+    get loop() {
+      return this.m_loop();
+    }
+
+    get pitch() {
+      return this.m_pitch();
+    }
+
+    get export() {
+      return this._loops.map(_ => _.pitch.export).filter(_ => _.length > 1);
+    }
+
     constructor($element) {
+      this._i = createSignal(0);
       this._overlay = createSignal();
       this.input = make_input(make_input_hooks(this));
       this.refs = [];
       this.controls = make_controls(this);
       this.tabbar = make_tabbar();
       this.player = make_player(this);
-      this.pitch = make_pitch(this);
-      this.loop = make_loop(this);
+      this._loops = [...Array(24).keys()].map(i => ({
+        loop: make_loop(this, i),
+        pitch: make_pitch(this)
+      }));
+      let m_loops = createMemo(() => this._loops[read(this._i)]);
+      this.m_loop = createMemo(() => m_loops().loop);
+      this.m_pitch = createMemo(() => m_loops().pitch);
+      createEffect(() => {
+        let cursor = this.loop.cursor;
+        this.pitch.cursor = cursor;
+        this.player.cursor = cursor;
+      });
+      let sound = this;
+      let vref = make_ref();
+      sound.refs.push(vref);
+      let vdrag;
+      createEffect(() => {
+        let $ref = vref.$ref;
+
+        if ($ref) {
+          if (vdrag) {
+            sound.refs.splice(sound.refs.indexOf(vdrag), 1);
+          }
+
+          vdrag = make_drag(make_vhooks(sound), $ref);
+          sound.refs.push(vdrag);
+        }
+      });
+      let ref = make_ref();
+      sound.refs.push(ref);
+      let drag;
+      createEffect(() => {
+        let $ref = ref.$ref;
+
+        if ($ref) {
+          if (drag) {
+            sound.refs.splice(sound.refs.indexOf(drag), 1);
+          }
+
+          drag = make_drag(make_hooks(sound), $ref);
+          sound.refs.push(drag);
+        }
+      });
+      this.pitch_ref = ref;
+      this.pitch_vref = vref;
     }
 
   }
@@ -2348,7 +2414,7 @@ var VSound = (function () {
   const make_pitch_bar = (sound, edit_cursor, i, y) => {
     let _wave = createSignal('triangle');
 
-    let _volume = createSignal(5);
+    let _volume = createSignal(0);
 
     let _y = createSignal(y);
 
@@ -2380,7 +2446,7 @@ var VSound = (function () {
     let m_player = createMemo(() => new PlayerController());
     return {
       get export() {
-        return [this.note_value, synth_con(this.volume, this.octave, read(_wave))];
+        return [this.note_value, synth_con(this.volume, this.octave, read(_wave)), this.volume];
       },
 
       get synth() {
@@ -2472,38 +2538,25 @@ var VSound = (function () {
     };
   };
 
+  function trim_end_export(e) {
+    let res = [];
+    let i = e.length - 1;
+
+    for (; i >= 0; i--) {
+      if (e[i][2] !== 0) {
+        break;
+      }
+    }
+
+    for (; i >= 0; i--) {
+      res.unshift(e[i].slice(0, 2));
+    }
+
+    return res;
+  }
+
   const make_pitch = sound => {
-    let vref = make_ref();
-    sound.refs.push(vref);
-    let vdrag;
-    createEffect(() => {
-      let $ref = vref.$ref;
-
-      if ($ref) {
-        if (vdrag) {
-          sound.refs.splice(sound.refs.indexOf(vdrag), 1);
-        }
-
-        vdrag = make_drag(make_vhooks(sound), $ref);
-        sound.refs.push(vdrag);
-      }
-    });
-    let ref = make_ref();
-    sound.refs.push(ref);
-    let drag;
     let drag_target = make_position(0, 0);
-    createEffect(() => {
-      let $ref = ref.$ref;
-
-      if ($ref) {
-        if (drag) {
-          sound.refs.splice(sound.refs.indexOf(drag), 1);
-        }
-
-        drag = make_drag(make_hooks(sound), $ref);
-        sound.refs.push(drag);
-      }
-    });
 
     let _edit_cursor = createSignal();
 
@@ -2530,7 +2583,9 @@ var VSound = (function () {
           end = 32;
         }
 
-        return [[sound.loop.speed, ...m_bars().slice(begin, end + 1).flatMap(_ => _.export)]];
+        let bars = m_bars().slice(begin, end + 1).map(_ => _.export);
+        bars = trim_end_export(bars);
+        return [sound.loop.speed, ...bars.flat()];
       },
 
       set_all_waves(wave) {
@@ -2567,7 +2622,7 @@ var VSound = (function () {
       },
 
       find_on_volume_start(drag) {
-        let res = vref.get_normal_at_abs_pos(drag);
+        let res = sound.pitch_vref.get_normal_at_abs_pos(drag);
 
         if (0 <= res.x && res.x <= 1 && 0 <= res.y && res.y <= 1.0) {
           let i = res.x * 32;
@@ -2577,21 +2632,19 @@ var VSound = (function () {
       },
 
       find_on_drag_start(drag) {
-        let res = ref.get_normal_at_abs_pos(drag);
+        let res = sound.pitch_ref.get_normal_at_abs_pos(drag);
 
         if (0 <= res.x && res.x <= 1 && 0 <= res.y && res.y <= 1.0) {
           let i = res.x * 32;
           set_y(Math.floor(i), 1 - res.y);
           return drag_target;
         }
-      },
+      }
 
-      ref,
-      vref
     };
   };
 
-  const make_loop = sound => {
+  const make_loop = (sound, i) => {
     let _speed = createSignal(9);
 
     let _mode = createSignal('stop');
@@ -2606,8 +2659,8 @@ var VSound = (function () {
       let i = read(_speed);
       return i * 16;
     });
-    createEffect(on(_mode[0], value => {
-      if (value === 'play') {
+    createEffect(on(() => [sound.i, _mode[0]()], ([_i, value]) => {
+      if (i === _i && value === 'play') {
         owrite(_cursor, read(_begin));
         let i = 0;
         let cancel = loop((dt, dt0) => {
@@ -2635,11 +2688,6 @@ var VSound = (function () {
         });
       }
     }));
-    createEffect(() => {
-      let cursor = read(_cursor);
-      sound.pitch.cursor = cursor;
-      sound.player.cursor = cursor;
-    });
     return {
       set speed(speed) {
         if (speed < 1 || speed > 20) {
@@ -2647,6 +2695,10 @@ var VSound = (function () {
         }
 
         owrite(_speed, speed);
+      },
+
+      get cursor() {
+        return read(_cursor);
       },
 
       get speed() {
@@ -2680,9 +2732,9 @@ var VSound = (function () {
     };
   };
 
-  var audiolib_code = "\n/*\n\nV Sound v1.0.0 \n\nMIT License\n\nCopyright (c) 2022 eguneys\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n*/\n    \nvar VSound = (function () {\n  'use strict';\n\n  const pitch_mask = 0x0000000f;\n  const octave_mask = 0x000000f0;\n  const accidental_mask = 0x0000f000;\n  function note_pitch(note) {\n    return note & pitch_mask;\n  }\n  function note_octave(note) {\n    return (note & octave_mask) >> 4;\n  }\n  function note_accidental(note) {\n    return (note & accidental_mask) >> 12;\n  }\n\n  function make_adsr(a, d, s, r) {\n    return {\n      a,\n      d,\n      s,\n      r\n    };\n  }\n  /* C C# D D# E F F# G G# A A# B */\n\n  const pitch_to_freq_index = [1, 1.5, 2, 2.5, 3, 4, 4.5, 5, 5.5, 6, 6.5, 7];\n  /* https://github.com/jergason/notes-to-frequencies/blob/master/index.js */\n\n  /* http://techlib.com/reference/musical_note_frequencies.htm#:~:text=Starting%20at%20any%20note%20the,be%20positive%2C%20negative%20or%20zero. */\n\n  /* https://newt.phys.unsw.edu.au/jw/notes.html */\n\n  function note_freq(note) {\n    let octave = note_octave(note);\n    let pitch = note_pitch(note);\n    let accidental = note_accidental(note);\n\n    if (accidental === 1) {\n      pitch += 0.5;\n    }\n\n    let n = pitch_to_freq_index.indexOf(pitch);\n    n += octave * 12;\n    return 440 * Math.pow(2, (n - 57) / 12);\n  }\n\n  function ads(param, now, {\n    a,\n    d,\n    s,\n    r\n  }, start, max) {\n    a /= 1000;\n    d /= 1000;\n    r /= 1000;\n    param.setValueAtTime(start, now);\n    param.linearRampToValueAtTime(max, now + a);\n    param.linearRampToValueAtTime(s, now + a + d);\n    /* not needed ? */\n    //param.setValueAtTime(s, now + a + d)\n  }\n\n  function r(param, now, {\n    r\n  }, min) {\n    r /= 1000;\n    param.cancelScheduledValues(now);\n    param.linearRampToValueAtTime(min, now + (r || 0));\n  }\n\n  class PlayerController {\n    get context() {\n      if (!this._context) {\n        this._context = new AudioContext();\n      }\n\n      return this._context;\n    }\n\n    get currentTime() {\n      return this.context.currentTime;\n    }\n\n    _gen_id = 0;\n\n    get next_id() {\n      return ++this._gen_id;\n    }\n\n    players = new Map();\n\n    attack(synth, note, time = 0) {\n      let {\n        next_id\n      } = this;\n      this.players.set(next_id, new MidiPlayer(this.context)._set_data({\n        synth,\n        freq: note_freq(note)\n      }).attack(time));\n      return next_id;\n    }\n\n    release(id, time = 0) {\n      let player = this.players.get(id);\n\n      if (player) {\n        player.release(time);\n      }\n\n      this.players.delete(id);\n    }\n\n  }\n\n  class HasAudioAnalyser {\n    get maxFilterFreq() {\n      return this.context.sampleRate / 2;\n    }\n\n    constructor(context) {\n      this.context = context;\n    }\n\n    attack(time = this.context.currentTime) {\n      let {\n        context\n      } = this;\n      this.gain = context.createGain();\n      this.analyser = context.createAnalyser();\n      this.gain.gain.setValueAtTime(1, time);\n      this.gain.connect(this.analyser);\n      this.analyser.connect(context.destination);\n\n      this._attack(time);\n\n      return this;\n    }\n\n    release(time = this.context.currentTime) {\n      this._release(time);\n\n      return this;\n    }\n\n  }\n\n  function getOscillator(context, type) {\n    return new OscillatorNode(context, {\n      type\n    });\n  }\n\n  class MidiPlayer extends HasAudioAnalyser {\n    _set_data(data) {\n      this.data = data;\n      return this;\n    }\n\n    _attack(now) {\n      let {\n        context,\n        maxFilterFreq\n      } = this;\n      let out_gain = this.gain;\n      let {\n        freq,\n        synth\n      } = this.data;\n      let {\n        wave,\n        volume,\n        cutoff,\n        cutoff_max,\n        amplitude,\n        filter_adsr,\n        amp_adsr\n      } = synth;\n      let osc1 = getOscillator(context, wave);\n      this.osc1 = osc1;\n      let osc2 = getOscillator(context, wave);\n      this.osc2 = osc2;\n      let osc1_mix = new GainNode(context);\n      osc1.connect(osc1_mix);\n      let osc2_mix = new GainNode(context);\n      osc2.connect(osc2_mix);\n      osc1_mix.gain.setValueAtTime(0.5, now);\n      osc2_mix.gain.setValueAtTime(0.5, now);\n      osc2.detune.setValueAtTime(700, now);\n      let filter = new BiquadFilterNode(context, {\n        type: 'lowpass'\n      });\n      this.filter = filter;\n      osc1_mix.connect(filter);\n      osc2_mix.connect(filter);\n      out_gain.gain.setValueAtTime(volume, now);\n      let envelope = new GainNode(context);\n      this.envelope = envelope;\n      filter.connect(envelope);\n      envelope.connect(out_gain);\n      osc1.frequency.setValueAtTime(freq, now);\n      osc2.frequency.setValueAtTime(freq, now);\n      /* Syntorial */\n\n      let _filter_adsr = { ...filter_adsr,\n        s: cutoff * maxFilterFreq * 0.4 + filter_adsr.s * cutoff_max * maxFilterFreq * 0.6\n      };\n      ads(filter.frequency, now, _filter_adsr, cutoff * maxFilterFreq * 0.4, cutoff * maxFilterFreq * 0.4 + cutoff_max * maxFilterFreq * 0.6);\n      ads(envelope.gain, now, amp_adsr, 0, amplitude * 0.5);\n      osc1.start(now);\n      osc2.start(now);\n    }\n\n    _release(now) {\n      let {\n        synth: {\n          cutoff,\n          amp_adsr,\n          filter_adsr\n        }\n      } = this.data;\n      let {\n        a,\n        d,\n        r: _r\n      } = amp_adsr;\n      a /= 1000;\n      d /= 1000;\n      _r /= 1000;\n      r(this.envelope.gain, now, amp_adsr, 0);\n      r(this.filter.frequency, now, filter_adsr, cutoff * this.maxFilterFreq * 0.4);\n      this.osc1.stop(now + a + d + _r);\n      this.osc2.stop(now + a + d + _r);\n    }\n\n  }\n\n  const waves = ['sine', 'sawtooth', 'triangle', 'square'];\n  const vol_mask = 0x00000f00;\n  const oct_mask = 0x000000f0;\n  const wave_mask = 0x0000000f;\n  function con_synth(synth) {\n    let wave = synth & wave_mask;\n    let octave = (synth & oct_mask) >> 4;\n    let vol = (synth & vol_mask) >> 8;\n    return [waves[wave], octave, vol];\n  }\n\n  function merge_notes(a, b) {\n    return a.every((_, i) => i === 0 || _ === b[i]);\n  }\n  /*\n   * vol, wave, note\n   * []\n   */\n\n\n  function VSound(data) {\n    let player = new PlayerController();\n    data = data.map(data => {\n      let [speed, ...rest] = data;\n      let res = [];\n\n      for (let i = 0; i < rest.length; i += 2) {\n        let note = rest[i],\n            [wave, oct, vol] = con_synth(rest[i + 1]);\n        let synth = {\n          wave: wave,\n          volume: vol / 5,\n          amplitude: 0.9,\n          cutoff: 0.6,\n          cutoff_max: 0.2,\n          amp_adsr: make_adsr(2, 8, 0.2, 10),\n          filter_adsr: make_adsr(0, 8, 0.2, 0)\n        };\n        res.push([synth, note, wave, oct, vol]);\n      }\n\n      return [speed, res];\n    });\n    return k => {\n      let [speed, res] = data[k];\n      let ttt = player.currentTime;\n      let play_buffer = [];\n\n      for (let i = 0; i < res.length; i++) {\n        let duration = speed * 16 / 1000;\n\n        if (play_buffer.includes(i)) {\n          ttt += duration;\n          continue;\n        }\n\n        let ri = res[i];\n        let lookaheads = [[i + 1, i + 2, i + 3], [i + 1, i + 2], [i + 1]].map(lookahead => lookahead.filter(_ => _ < res.length).map(_ => res[_]));\n        let note_duration = 1;\n\n        if (lookaheads[0].length === 3 && lookaheads[0].every(_ => merge_notes(ri, _))) {\n          note_duration = 4;\n          play_buffer = [i + 1, i + 2, i + 3];\n        } else if (lookaheads[1].length === 2 && lookaheads[1].every(_ => merge_notes(ri, _))) {\n          note_duration = 3;\n          play_buffer = [i + 1, i + 2];\n        } else if (lookaheads[2].length === 1 && lookaheads[2].every(_ => merge_notes(ri, _))) {\n          note_duration = 2;\n          play_buffer = [i + 1];\n        } else {\n          play_buffer = [];\n        }\n\n        duration *= note_duration;\n        let synth = ri[0],\n            note = ri[1];\n        let id = player.attack(synth, note, ttt);\n        player.release(id, ttt + duration);\n        console.log(synth, duration, ttt);\n        ttt += duration;\n      }\n    };\n  }\n\n  return VSound;\n\n})();\n";
+  var audiolib_code = "\n/*\n\nV Sound v1.0.0 \n\nMIT License\n\nCopyright (c) 2022 eguneys\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n*/\n    \nvar VSound = (function () {\n  'use strict';\n\n  const pitch_mask = 0x0000000f;\n  const octave_mask = 0x000000f0;\n  const accidental_mask = 0x0000f000;\n  function note_pitch(note) {\n    return note & pitch_mask;\n  }\n  function note_octave(note) {\n    return (note & octave_mask) >> 4;\n  }\n  function note_accidental(note) {\n    return (note & accidental_mask) >> 12;\n  }\n\n  function make_adsr(a, d, s, r) {\n    return {\n      a,\n      d,\n      s,\n      r\n    };\n  }\n  /* C C# D D# E F F# G G# A A# B */\n\n  const pitch_to_freq_index = [1, 1.5, 2, 2.5, 3, 4, 4.5, 5, 5.5, 6, 6.5, 7];\n  /* https://github.com/jergason/notes-to-frequencies/blob/master/index.js */\n\n  /* http://techlib.com/reference/musical_note_frequencies.htm#:~:text=Starting%20at%20any%20note%20the,be%20positive%2C%20negative%20or%20zero. */\n\n  /* https://newt.phys.unsw.edu.au/jw/notes.html */\n\n  function note_freq(note) {\n    let octave = note_octave(note);\n    let pitch = note_pitch(note);\n    let accidental = note_accidental(note);\n\n    if (accidental === 1) {\n      pitch += 0.5;\n    }\n\n    let n = pitch_to_freq_index.indexOf(pitch);\n    n += octave * 12;\n    return 440 * Math.pow(2, (n - 57) / 12);\n  }\n\n  function ads(param, now, {\n    a,\n    d,\n    s,\n    r\n  }, start, max) {\n    a /= 1000;\n    d /= 1000;\n    r /= 1000;\n    param.setValueAtTime(start, now);\n    param.linearRampToValueAtTime(max, now + a);\n    param.linearRampToValueAtTime(s, now + a + d);\n    /* not needed ? */\n    //param.setValueAtTime(s, now + a + d)\n  }\n\n  function r(param, now, {\n    r\n  }, min) {\n    r /= 1000;\n    param.cancelScheduledValues(now);\n    param.linearRampToValueAtTime(min, now + (r || 0));\n  }\n\n  class PlayerController {\n    get context() {\n      if (!this._context) {\n        this._context = new AudioContext();\n      }\n\n      return this._context;\n    }\n\n    get currentTime() {\n      return this.context.currentTime;\n    }\n\n    _gen_id = 0;\n\n    get next_id() {\n      return ++this._gen_id;\n    }\n\n    players = new Map();\n\n    attack(synth, note, time = 0) {\n      let {\n        next_id\n      } = this;\n      this.players.set(next_id, new MidiPlayer(this.context)._set_data({\n        synth,\n        freq: note_freq(note)\n      }).attack(time));\n      return next_id;\n    }\n\n    release(id, time = 0) {\n      let player = this.players.get(id);\n\n      if (player) {\n        player.release(time);\n      }\n\n      this.players.delete(id);\n    }\n\n  }\n\n  class HasAudioAnalyser {\n    get maxFilterFreq() {\n      return this.context.sampleRate / 2;\n    }\n\n    constructor(context) {\n      this.context = context;\n    }\n\n    attack(time = this.context.currentTime) {\n      let {\n        context\n      } = this;\n      this.gain = context.createGain();\n      this.analyser = context.createAnalyser();\n      this.gain.gain.setValueAtTime(1, time);\n      this.gain.connect(this.analyser);\n      this.analyser.connect(context.destination);\n\n      this._attack(time);\n\n      return this;\n    }\n\n    release(time = this.context.currentTime) {\n      this._release(time);\n\n      return this;\n    }\n\n  }\n\n  function getOscillator(context, type) {\n    return new OscillatorNode(context, {\n      type\n    });\n  }\n\n  class MidiPlayer extends HasAudioAnalyser {\n    _set_data(data) {\n      this.data = data;\n      return this;\n    }\n\n    _attack(now) {\n      let {\n        context,\n        maxFilterFreq\n      } = this;\n      let out_gain = this.gain;\n      let {\n        freq,\n        synth\n      } = this.data;\n      let {\n        wave,\n        volume,\n        cutoff,\n        cutoff_max,\n        amplitude,\n        filter_adsr,\n        amp_adsr\n      } = synth;\n      let osc1 = getOscillator(context, wave);\n      this.osc1 = osc1;\n      let osc2 = getOscillator(context, wave);\n      this.osc2 = osc2;\n      let osc1_mix = new GainNode(context);\n      osc1.connect(osc1_mix);\n      let osc2_mix = new GainNode(context);\n      osc2.connect(osc2_mix);\n      osc1_mix.gain.setValueAtTime(0.5, now);\n      osc2_mix.gain.setValueAtTime(0.5, now);\n      osc2.detune.setValueAtTime(700, now);\n      let filter = new BiquadFilterNode(context, {\n        type: 'lowpass'\n      });\n      this.filter = filter;\n      osc1_mix.connect(filter);\n      osc2_mix.connect(filter);\n      out_gain.gain.setValueAtTime(volume, now);\n      let envelope = new GainNode(context);\n      this.envelope = envelope;\n      filter.connect(envelope);\n      envelope.connect(out_gain);\n      osc1.frequency.setValueAtTime(freq, now);\n      osc2.frequency.setValueAtTime(freq, now);\n      /* Syntorial */\n\n      let _filter_adsr = { ...filter_adsr,\n        s: cutoff * maxFilterFreq * 0.4 + filter_adsr.s * cutoff_max * maxFilterFreq * 0.6\n      };\n      ads(filter.frequency, now, _filter_adsr, cutoff * maxFilterFreq * 0.4, cutoff * maxFilterFreq * 0.4 + cutoff_max * maxFilterFreq * 0.6);\n      ads(envelope.gain, now, amp_adsr, 0, amplitude * 0.5);\n      osc1.start(now);\n      osc2.start(now);\n    }\n\n    _release(now) {\n      let {\n        synth: {\n          cutoff,\n          amp_adsr,\n          filter_adsr\n        }\n      } = this.data;\n      let {\n        a,\n        d,\n        r: _r\n      } = amp_adsr;\n      a /= 1000;\n      d /= 1000;\n      _r /= 1000;\n      r(this.envelope.gain, now, amp_adsr, 0);\n      r(this.filter.frequency, now, filter_adsr, cutoff * this.maxFilterFreq * 0.4);\n      this.osc1.stop(now + a + d + _r);\n      this.osc2.stop(now + a + d + _r);\n    }\n\n  }\n\n  const waves = ['sine', 'sawtooth', 'triangle', 'square'];\n  const vol_mask = 0x00000f00;\n  const oct_mask = 0x000000f0;\n  const wave_mask = 0x0000000f;\n  function con_synth(synth) {\n    let wave = synth & wave_mask;\n    let octave = (synth & oct_mask) >> 4;\n    let vol = (synth & vol_mask) >> 8;\n    return [waves[wave], octave, vol];\n  }\n\n  function merge_notes(a, b) {\n    return a.every((_, i) => i === 0 || _ === b[i]);\n  }\n  /*\n   * vol, wave, note\n   * []\n   */\n\n\n  function VSound(data) {\n    let player = new PlayerController();\n    data = data.map(data => {\n      let [speed, ...rest] = data;\n      let res = [];\n\n      for (let i = 0; i < rest.length; i += 2) {\n        let note = rest[i],\n            [wave, oct, vol] = con_synth(rest[i + 1]);\n        let synth = {\n          wave: wave,\n          volume: vol / 5,\n          amplitude: 0.9,\n          cutoff: 0.6,\n          cutoff_max: 0.2,\n          amp_adsr: make_adsr(2, 8, 0.2, 10),\n          filter_adsr: make_adsr(0, 8, 0.2, 0)\n        };\n        res.push([synth, note, wave, oct, vol]);\n      }\n\n      return [speed, res];\n    });\n    return k => {\n      let [speed, res] = data[k];\n      let ttt = player.currentTime;\n      let play_buffer = [];\n\n      for (let i = 0; i < res.length; i++) {\n        let duration = speed * 16 / 1000;\n\n        if (play_buffer.includes(i)) {\n          ttt += duration;\n          continue;\n        }\n\n        let ri = res[i];\n        let lookaheads = [[i + 1, i + 2, i + 3], [i + 1, i + 2], [i + 1]].map(lookahead => lookahead.filter(_ => _ < res.length).map(_ => res[_]));\n        let note_duration = 1;\n\n        if (lookaheads[0].length === 3 && lookaheads[0].every(_ => merge_notes(ri, _))) {\n          note_duration = 4;\n          play_buffer = [i + 1, i + 2, i + 3];\n        } else if (lookaheads[1].length === 2 && lookaheads[1].every(_ => merge_notes(ri, _))) {\n          note_duration = 3;\n          play_buffer = [i + 1, i + 2];\n        } else if (lookaheads[2].length === 1 && lookaheads[2].every(_ => merge_notes(ri, _))) {\n          note_duration = 2;\n          play_buffer = [i + 1];\n        } else {\n          play_buffer = [];\n        }\n\n        duration *= note_duration;\n        let synth = ri[0],\n            note = ri[1];\n        let id = player.attack(synth, note, ttt);\n        player.release(id, ttt + duration);\n        ttt += duration;\n      }\n    };\n  }\n\n  return VSound;\n\n})();\n";
 
-  const _tmpl$ = /*#__PURE__*/template(`<vsound><tabbar><label>graph</label><label>list</label></tabbar><toolbar><box><label>speed</label> </box><box><label>loop</label><label class="play"></label></box><box><label class="export">export</label><label class="help">help</label></box><box class="wave"><label>wave</label></box></toolbar><statusbar><span>&nbsp</span></statusbar></vsound>`),
+  const _tmpl$ = /*#__PURE__*/template(`<vsound><tabbar><label>graph</label><label>list</label></tabbar><toolbar><box><label>i</label> </box><box><label>speed</label> </box><box><label>loop</label><label class="play"></label></box><box><label class="export">export</label><label class="help">help</label></box><box class="wave"><label>wave</label></box></toolbar><statusbar><span>&nbsp</span></statusbar></vsound>`),
         _tmpl$2 = /*#__PURE__*/template(`<span></span>`),
         _tmpl$3 = /*#__PURE__*/template(`<overlay></overlay>`),
         _tmpl$4 = /*#__PURE__*/template(`<export><h2> Export</h2><p><span> Data </span></p><h3> Usage </h3><p><span>// Include Player Library</span><br><span>// Include Data</span><br><span>// Then use it like</span><br></p><p><span> Player Library </span></p></export>`),
@@ -2693,7 +2745,7 @@ var VSound = (function () {
         _tmpl$9 = /*#__PURE__*/template(`<label class="volume">:volume</label>`),
         _tmpl$10 = /*#__PURE__*/template(`<volume-bar></volume-bar>`),
         _tmpl$11 = /*#__PURE__*/template(`<list-list><div><div class="group"><label>octave</label><octave></octave></div><div class="group"><label>volume</label><volume></volume></div></div><list-bar></list-bar></list-list>`),
-        _tmpl$12 = /*#__PURE__*/template(`<bar><span></span><span></span><span></span><span></span></bar>`),
+        _tmpl$12 = /*#__PURE__*/template(`<span>.</span>`),
         _tmpl$13 = /*#__PURE__*/template(`<bar></bar>`),
         _tmpl$14 = /*#__PURE__*/template(`<vbar></vbar>`),
         _tmpl$15 = /*#__PURE__*/template(`<div class="up-down"><span class="value-down">&lt;</span><span class="value"> <!> </span> <span class="value-up">></span></div>`);
@@ -2723,14 +2775,17 @@ var VSound = (function () {
             _el$7 = _el$6.firstChild;
             _el$7.nextSibling;
             const _el$9 = _el$6.nextSibling,
-            _el$10 = _el$9.firstChild,
-            _el$11 = _el$10.nextSibling,
-            _el$12 = _el$9.nextSibling,
+            _el$10 = _el$9.firstChild;
+            _el$10.nextSibling;
+            const _el$12 = _el$9.nextSibling,
             _el$13 = _el$12.firstChild,
             _el$14 = _el$13.nextSibling,
-            _el$15 = _el$12.nextSibling;
-            _el$15.firstChild;
-            const _el$17 = _el$5.nextSibling;
+            _el$15 = _el$12.nextSibling,
+            _el$16 = _el$15.firstChild,
+            _el$17 = _el$16.nextSibling,
+            _el$18 = _el$15.nextSibling;
+            _el$18.firstChild;
+            const _el$20 = _el$5.nextSibling;
 
       _el$.$$click = _ => sound.overlay = undefined;
 
@@ -2740,56 +2795,64 @@ var VSound = (function () {
 
       insert(_el$6, createComponent(UpDownControl, {
         get value() {
+          return sound.i;
+        },
+
+        setValue: _ => sound.i = _
+      }), null);
+
+      insert(_el$9, createComponent(UpDownControl, {
+        get value() {
           return sound.loop.speed;
         },
 
         setValue: _ => sound.loop.speed = _
       }), null);
 
-      insert(_el$9, createComponent(UpDownControl, {
+      insert(_el$12, createComponent(UpDownControl, {
         get value() {
           return sound.loop.begin;
         },
 
         setValue: _ => sound.loop.begin = _
-      }), _el$11);
+      }), _el$14);
 
-      insert(_el$9, createComponent(UpDownControl, {
+      insert(_el$12, createComponent(UpDownControl, {
         get value() {
           return sound.loop.end;
         },
 
         setValue: _ => sound.loop.end = _
-      }), _el$11);
+      }), _el$14);
 
-      _el$11.$$click = _ => sound.loop.change_mode();
+      _el$14.$$click = _ => sound.loop.change_mode();
 
-      insert(_el$11, () => sound.loop.mode);
+      insert(_el$14, () => sound.loop.mode);
 
-      _el$13.$$click = _ => {
+      _el$16.$$click = _ => {
         _.stopPropagation();
 
         sound.overlay = sound.overlay === 'export' ? undefined : 'export';
       };
 
-      _el$14.$$click = _ => {
+      _el$17.$$click = _ => {
         _.stopPropagation();
 
         sound.overlay = sound.overlay === 'help' ? undefined : 'help';
       };
 
-      insert(_el$15, createComponent(For, {
+      insert(_el$18, createComponent(For, {
         each: ['sine', 'square', 'triangle', 'sawtooth'],
         children: i => (() => {
-          const _el$18 = _tmpl$2.cloneNode(true);
+          const _el$21 = _tmpl$2.cloneNode(true);
 
-          _el$18.$$click = _ => sound.controls.wave = i;
+          _el$21.$$click = _ => sound.controls.wave = i;
 
-          insert(_el$18, () => i.slice(0, 3));
+          insert(_el$21, () => i.slice(0, 3));
 
-          createRenderEffect(() => className(_el$18, sound.controls.wave === i ? 'active' : ''));
+          createRenderEffect(() => className(_el$21, sound.controls.wave === i ? 'active' : ''));
 
-          return _el$18;
+          return _el$21;
         })()
       }), null);
 
@@ -2800,7 +2863,7 @@ var VSound = (function () {
           return comps[sound.tabbar.active];
         }
 
-      }), _el$17);
+      }), _el$20);
 
       insert(_el$, createComponent(Show, {
         get when() {
@@ -2808,11 +2871,11 @@ var VSound = (function () {
         },
 
         children: value => (() => {
-          const _el$19 = _tmpl$3.cloneNode(true);
+          const _el$22 = _tmpl$3.cloneNode(true);
 
-          _el$19.$$click = e => e.stopPropagation();
+          _el$22.$$click = e => e.stopPropagation();
 
-          insert(_el$19, createComponent(Dynamic, {
+          insert(_el$22, createComponent(Dynamic, {
             sound: sound,
 
             get component() {
@@ -2821,7 +2884,7 @@ var VSound = (function () {
 
           }));
 
-          return _el$19;
+          return _el$22;
         })()
       }), null);
 
@@ -2842,36 +2905,36 @@ var VSound = (function () {
   };
 
   const Export = props => {
-    let data_res = `let data = ${JSON.stringify(props.sound.pitch.export)}`;
+    let data_res = `let data = ${JSON.stringify(props.sound.export)}`;
     return (() => {
-      const _el$20 = _tmpl$4.cloneNode(true),
-            _el$21 = _el$20.firstChild,
-            _el$22 = _el$21.nextSibling;
-            _el$22.firstChild;
-            const _el$24 = _el$22.nextSibling,
-            _el$25 = _el$24.nextSibling,
-            _el$26 = _el$25.firstChild,
-            _el$27 = _el$26.nextSibling,
+      const _el$23 = _tmpl$4.cloneNode(true),
+            _el$24 = _el$23.firstChild,
+            _el$25 = _el$24.nextSibling;
+            _el$25.firstChild;
+            const _el$27 = _el$25.nextSibling,
             _el$28 = _el$27.nextSibling,
-            _el$29 = _el$28.nextSibling,
-            _el$30 = _el$29.nextSibling;
-            _el$30.nextSibling;
-            const _el$32 = _el$25.nextSibling;
-            _el$32.firstChild;
+            _el$29 = _el$28.firstChild,
+            _el$30 = _el$29.nextSibling,
+            _el$31 = _el$30.nextSibling,
+            _el$32 = _el$31.nextSibling,
+            _el$33 = _el$32.nextSibling;
+            _el$33.nextSibling;
+            const _el$35 = _el$28.nextSibling;
+            _el$35.firstChild;
 
-      insert(_el$22, createComponent(CopyCode, {
+      insert(_el$25, createComponent(CopyCode, {
         children: data_res
       }), null);
 
-      insert(_el$25, createComponent(CopyCode, {
+      insert(_el$28, createComponent(CopyCode, {
         children: "let p = VSound(data); p(0) // play a sound by index"
       }), null);
 
-      insert(_el$32, createComponent(CopyCode, {
+      insert(_el$35, createComponent(CopyCode, {
         children: audiolib_code
       }), null);
 
-      return _el$20;
+      return _el$23;
     })();
   };
 
@@ -2890,17 +2953,17 @@ var VSound = (function () {
     }
 
     return (() => {
-      const _el$34 = _tmpl$5.cloneNode(true),
-            _el$35 = _el$34.firstChild,
-            _el$36 = _el$35.nextSibling;
+      const _el$37 = _tmpl$5.cloneNode(true),
+            _el$38 = _el$37.firstChild,
+            _el$39 = _el$38.nextSibling;
 
-      _el$35.$$click = _ => copy();
+      _el$38.$$click = _ => copy();
 
-      insert(_el$35, () => text[0]());
+      insert(_el$38, () => text[0]());
 
-      insert(_el$36, () => props.children);
+      insert(_el$39, () => props.children);
 
-      return _el$34;
+      return _el$37;
     })();
   };
 
@@ -2918,13 +2981,13 @@ var VSound = (function () {
       sound
     } = props;
     return [_tmpl$7.cloneNode(true), (() => {
-      const _el$39 = document.importNode(_tmpl$8, true);
+      const _el$42 = document.importNode(_tmpl$8, true);
 
-      (_ => setTimeout(() => sound.pitch.ref.$ref = _))(_el$39);
+      (_ => setTimeout(() => sound.pitch_ref.$ref = _))(_el$42);
 
-      _el$39._$owner = getOwner();
+      _el$42._$owner = getOwner();
 
-      insert(_el$39, createComponent(For, {
+      insert(_el$42, createComponent(For, {
         get each() {
           return sound.pitch.bars;
         },
@@ -2934,15 +2997,15 @@ var VSound = (function () {
         })
       }));
 
-      return _el$39;
+      return _el$42;
     })(), _tmpl$9.cloneNode(true), (() => {
-      const _el$41 = document.importNode(_tmpl$10, true);
+      const _el$44 = document.importNode(_tmpl$10, true);
 
-      (_ => setTimeout(() => sound.pitch.vref.$ref = _))(_el$41);
+      (_ => setTimeout(() => sound.pitch_vref.$ref = _))(_el$44);
 
-      _el$41._$owner = getOwner();
+      _el$44._$owner = getOwner();
 
-      insert(_el$41, createComponent(For, {
+      insert(_el$44, createComponent(For, {
         get each() {
           return sound.pitch.bars;
         },
@@ -2952,7 +3015,7 @@ var VSound = (function () {
         })
       }));
 
-      return _el$41;
+      return _el$44;
     })()];
   };
 
@@ -2961,51 +3024,51 @@ var VSound = (function () {
       sound
     } = props;
     return (() => {
-      const _el$42 = document.importNode(_tmpl$11, true),
-            _el$43 = _el$42.firstChild,
-            _el$44 = _el$43.firstChild,
-            _el$45 = _el$44.firstChild,
-            _el$46 = _el$45.nextSibling,
-            _el$47 = _el$44.nextSibling,
+      const _el$45 = document.importNode(_tmpl$11, true),
+            _el$46 = _el$45.firstChild,
+            _el$47 = _el$46.firstChild,
             _el$48 = _el$47.firstChild,
             _el$49 = _el$48.nextSibling,
-            _el$50 = _el$43.nextSibling;
+            _el$50 = _el$47.nextSibling,
+            _el$51 = _el$50.firstChild,
+            _el$52 = _el$51.nextSibling,
+            _el$53 = _el$46.nextSibling;
 
-      _el$42._$owner = getOwner();
-
-      insert(_el$46, createComponent(For, {
-        each: [3, 4, 5],
-        children: i => (() => {
-          const _el$51 = _tmpl$2.cloneNode(true);
-
-          _el$51.$$click = _ => sound.controls.octave = i;
-
-          insert(_el$51, i);
-
-          createRenderEffect(() => className(_el$51, sound.controls.octave === i ? 'active' : ''));
-
-          return _el$51;
-        })()
-      }));
+      _el$45._$owner = getOwner();
 
       insert(_el$49, createComponent(For, {
-        each: [0, 1, 2, 3, 4, 5],
+        each: [3, 4, 5],
         children: i => (() => {
-          const _el$52 = _tmpl$2.cloneNode(true);
+          const _el$54 = _tmpl$2.cloneNode(true);
 
-          _el$52.$$click = _ => sound.controls.volume = i;
+          _el$54.$$click = _ => sound.controls.octave = i;
 
-          insert(_el$52, i);
+          insert(_el$54, i);
 
-          createRenderEffect(() => className(_el$52, sound.controls.volume === i ? 'active' : ''));
+          createRenderEffect(() => className(_el$54, sound.controls.octave === i ? 'active' : ''));
 
-          return _el$52;
+          return _el$54;
         })()
       }));
 
-      _el$50._$owner = getOwner();
+      insert(_el$52, createComponent(For, {
+        each: [0, 1, 2, 3, 4, 5],
+        children: i => (() => {
+          const _el$55 = _tmpl$2.cloneNode(true);
 
-      insert(_el$50, createComponent(For, {
+          _el$55.$$click = _ => sound.controls.volume = i;
+
+          insert(_el$55, i);
+
+          createRenderEffect(() => className(_el$55, sound.controls.volume === i ? 'active' : ''));
+
+          return _el$55;
+        })()
+      }));
+
+      _el$53._$owner = getOwner();
+
+      insert(_el$53, createComponent(For, {
         get each() {
           return sound.pitch.bars;
         },
@@ -3015,7 +3078,7 @@ var VSound = (function () {
         })
       }));
 
-      return _el$42;
+      return _el$45;
     })();
   };
 
@@ -3028,63 +3091,90 @@ var VSound = (function () {
     const or_dot = _ => !!_ ? _ : '.';
 
     return (() => {
-      const _el$53 = _tmpl$12.cloneNode(true),
-            _el$54 = _el$53.firstChild,
-            _el$55 = _el$54.nextSibling,
-            _el$56 = _el$55.nextSibling,
-            _el$57 = _el$56.nextSibling;
+      const _el$56 = _tmpl$13.cloneNode(true);
 
-      _el$53.$$click = _ => props.item.select();
+      _el$56.$$click = _ => props.item.select();
 
-      insert(_el$54, () => or_dot(props.item.note));
+      insert(_el$56, createComponent(Show, {
+        get when() {
+          return props.item.volume === 0;
+        },
 
-      insert(_el$55, () => or_dot(props.item.octave));
+        get fallback() {
+          return [(() => {
+            const _el$61 = _tmpl$2.cloneNode(true);
 
-      insert(_el$56, () => or_dot(props.item.wave));
+            insert(_el$61, () => or_dot(props.item.note));
 
-      insert(_el$57, () => or_dot(props.item.volume));
+            return _el$61;
+          })(), (() => {
+            const _el$62 = _tmpl$2.cloneNode(true);
 
-      createRenderEffect(() => className(_el$53, [props.item.klass, props.item.lklass].join(' ')));
+            insert(_el$62, () => or_dot(props.item.octave));
 
-      return _el$53;
+            return _el$62;
+          })(), (() => {
+            const _el$63 = _tmpl$2.cloneNode(true);
+
+            insert(_el$63, () => or_dot(props.item.wave));
+
+            return _el$63;
+          })(), (() => {
+            const _el$64 = _tmpl$2.cloneNode(true);
+
+            insert(_el$64, () => or_dot(props.item.volume));
+
+            return _el$64;
+          })()];
+        },
+
+        get children() {
+          return [_tmpl$12.cloneNode(true), _tmpl$12.cloneNode(true), _tmpl$12.cloneNode(true), _tmpl$12.cloneNode(true)];
+        }
+
+      }));
+
+      createRenderEffect(() => className(_el$56, [props.item.klass, props.item.lklass].join(' ')));
+
+      return _el$56;
     })();
   };
 
   const Bar = props => {
     return (() => {
-      const _el$58 = _tmpl$13.cloneNode(true);
+      const _el$65 = _tmpl$13.cloneNode(true);
 
       createRenderEffect(_p$ => {
         const _v$3 = props.item.klass,
               _v$4 = props.item.style;
-        _v$3 !== _p$._v$3 && className(_el$58, _p$._v$3 = _v$3);
-        _p$._v$4 = style(_el$58, _v$4, _p$._v$4);
+        _v$3 !== _p$._v$3 && className(_el$65, _p$._v$3 = _v$3);
+        _p$._v$4 = style(_el$65, _v$4, _p$._v$4);
         return _p$;
       }, {
         _v$3: undefined,
         _v$4: undefined
       });
 
-      return _el$58;
+      return _el$65;
     })();
   };
 
   const VolumeBar = props => {
     return (() => {
-      const _el$59 = _tmpl$14.cloneNode(true);
+      const _el$66 = _tmpl$14.cloneNode(true);
 
       createRenderEffect(_p$ => {
         const _v$5 = props.item.vklass,
               _v$6 = props.item.vstyle;
-        _v$5 !== _p$._v$5 && className(_el$59, _p$._v$5 = _v$5);
-        _p$._v$6 = style(_el$59, _v$6, _p$._v$6);
+        _v$5 !== _p$._v$5 && className(_el$66, _p$._v$5 = _v$5);
+        _p$._v$6 = style(_el$66, _v$6, _p$._v$6);
         return _p$;
       }, {
         _v$5: undefined,
         _v$6: undefined
       });
 
-      return _el$59;
+      return _el$66;
     })();
   };
 
@@ -3096,24 +3186,24 @@ var VSound = (function () {
     };
 
     return (() => {
-      const _el$60 = _tmpl$15.cloneNode(true),
-            _el$61 = _el$60.firstChild,
-            _el$62 = _el$61.nextSibling,
-            _el$63 = _el$62.firstChild,
-            _el$65 = _el$63.nextSibling;
-            _el$65.nextSibling;
-            const _el$66 = _el$62.nextSibling,
-            _el$67 = _el$66.nextSibling;
+      const _el$67 = _tmpl$15.cloneNode(true),
+            _el$68 = _el$67.firstChild,
+            _el$69 = _el$68.nextSibling,
+            _el$70 = _el$69.firstChild,
+            _el$72 = _el$70.nextSibling;
+            _el$72.nextSibling;
+            const _el$73 = _el$69.nextSibling,
+            _el$74 = _el$73.nextSibling;
 
-      _el$61.$$click = _ => value(-1);
+      _el$68.$$click = _ => value(-1);
 
-      _el$62.$$click = _ => value(+1);
+      _el$69.$$click = _ => value(+1);
 
-      insert(_el$62, () => dformat(props.value), _el$65);
+      insert(_el$69, () => dformat(props.value), _el$72);
 
-      _el$67.$$click = _ => value(+1);
+      _el$74.$$click = _ => value(+1);
 
-      return _el$60;
+      return _el$67;
     })();
   };
 
