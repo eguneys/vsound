@@ -69,8 +69,17 @@ export default class Sound {
     this.refs.forEach(_ => _.$clear_bounds())
   }
 
+  get overlay() {
+    return read(this._overlay)
+  }
+
+  set overlay(overlay: Overlay) {
+    owrite(this._overlay, overlay)
+  }
+
   constructor($element) {
 
+    this._overlay = createSignal()
     this.input = make_input(make_input_hooks(this))
 
     this.refs = []

@@ -19,7 +19,7 @@ export const App = sound => props => {
 
   onCleanup(() => unbinds.forEach(_ => _()));
 
-  return (<vsound>
+  return (<vsound onClick={_ => sound.overlay = undefined}>
     <tabbar>
       <label onClick={_ => sound.tabbar.active = 'graph' } class={sound.tabbar.active === 'graph' ? 'active': ''}>graph</label>
       <label onClick={_ => sound.tabbar.active = 'list' } class={sound.tabbar.active === 'list' ? 'active' : ''}>list</label>
@@ -34,6 +34,10 @@ export const App = sound => props => {
       <UpDownControl value={sound.loop.end} setValue={_ => sound.loop.end = _}/>
       <label onClick={_ => sound.loop.change_mode()} class='play'>{sound.loop.mode}</label>
     </box>
+    <box>
+      <label  onClick={_ => { _.stopPropagation(); sound.overlay=sound.overlay === 'export' ? undefined : 'export'}} class='export'>export</label>
+      <label onClick={_ => { _.stopPropagation(); sound.overlay=sound.overlay === 'help' ? undefined : 'help' }} class='help'>help</label>
+    </box>
     <box class='wave'>
       <label>wave</label>
       <For each={['sine','square','triangle','sawtooth']}>{ i =>
@@ -45,7 +49,50 @@ export const App = sound => props => {
     <statusbar>
       <span>&nbsp</span>
     </statusbar>
+    <Show when={sound.overlay}>{value => 
+    <overlay onClick={e => e.stopPropagation()}>
+      <Dynamic component={overlays[value]}/>
+    </overlay>
+    }</Show>
     </vsound>)
+}
+
+
+const Export = props => {
+  return (<export>
+    Export
+      </export>)
+}
+
+const Help = props => {
+  return (<help>
+   <h2> V Sound v0.9 </h2>
+   <small>Designed to export sound effects with small size for use in JS13k.</small>
+   <p>
+     <span> Inspired by PICO-8 </span>
+   </p>
+   <h3> Shortcuts </h3>
+   <p> 
+     <span>Black keys:  i  o  p  [  ]</span>
+     <span>White keys:  Space  j  k  l  ;  '  \</span>
+     
+     <span>Octave higher:</span>
+     <span>Black keys:  w  e  r  t  y</span>
+     <span>White keys:  a  s  d  f  g  h</span>
+     <span> Hold shift and select a waveform or volume will set all notes </span>
+   </p>
+   <p>
+     <small> Search "PICO 8 Sound Editor" if you get confused on how to use this. </small>
+   </p>
+   <footer>
+     <i><small> Music tracker feature is planned to be made in future release.</small> </i>
+   </footer>
+      </help>)
+}
+
+const overlays = {
+  'help': Help,
+  'export': Export
 }
 
 const PitchBar = props => {

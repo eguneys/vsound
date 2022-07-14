@@ -96,3 +96,14 @@ label.volume {
   background: lightgreen;
   color: black;
 }
+
+overlay {
+  background: #222;
+  color: white;
+}
+
+box .help,
+box .export {
+  background: #111;
+  color: white;
+}
